@@ -1,0 +1,90 @@
+mangos-zero-tracker ![Project status](http://getmangos.com/assets/img/repository-status-maintained.png)
+===================
+A database tracker for [mangos-zero][10], and *World of Warcraft Client Patch
+1.12* - [_Drums of War_][50]. It is compatible with client 1.12.1 (build 5875),
+and 1.12.2 (build 6005).
+
+It is used to validate content in the *mangos-zero* database against _DBC_
+default values extracted by a [PEAR][20] based command line utility.
+
+Compatibility
+-------------
+This database is compatible with *mangos-zero z1762*, and requires DBC files
+to be extracted from World of Warcraft client 1.12.1 (build 5875).  Other client
+versions are _not_ supported.
+
+
+Requirements
+------------
+To use this application, a working PHP 5.3 installation for both the command
+line and web usage is mandatory.  [PEAR][20] is used for common tasks such as
+[command line][21] functions and [database connectivity][22].
+
+
+Installation
+------------
+To use the tracker, you will have to create an additional database (the default
+database name being `zp_tracker`), where the tracker can store data extracted
+from the World of Warcraft client 1.12.1 (build 5875), user data, game database
+version information, and - of course - the actual data status users report.
+
+The database schema is provided in `sql/create_structure.sql` and may e.g. be
+used by running
+
+    mysql -uzp -hlocalhost -pzpdb zp_tracker < sql/create_structure.sql
+
+after creating the `zp_tracker` database.
+
+If you need a different database name, user, host, etc. you can change default
+values in the `config.php` file to match your needs.  `config.php` also needs to
+be edited to specify the name you have used for your mangos-zero world database,
+which by default is set to `zp_world`.
+
+Once you have installed the database, you will need to open a console / terminal
+window, and execute `extract.php`
+
+    php extract.php
+
+If your database is properly configured, this should display all data being
+parsed and extracted from the World of Warcraft client 1.12.1 (build 5875)
+DBC files.
+
+Once finished, you can use the tracker just like any other PHP web application
+and put the application folder somewhere into your document root, or add an
+Alias to your Apache configuration, e.g. by adding
+
+	Alias /tracker "/home/username/mangos/zero/tracker"
+	<Directory "/home/username/mangos/zero/tracker">
+		AllowOverride All
+		Options FollowSymlinks
+		Order allow,deny
+		Allow from all
+	</Directory>
+
+to your Apache configuration.  This can be done global or in a virtual host.
+
+
+And if something goes wrong?
+----------------------------
+... for now you will have to figure out on your own.  This repository currently
+is intended to kickstart development.  Of course, you are welcome to fork the
+repository, and submit pull requests with your changes.
+
+_If_ you feel like submitting an issue, please do so *only* if you are willing
+to provide a detailed report, and are available to verify any solution to the
+issue provided by the developers of this repository.
+
+
+[10]: https://github.com/mangos-zero/server "mangos-zero"
+[11]: https://github.com/mangos-zero/scriptdev0 "mangos-zero scriptdev"
+[12]: https://github.com/mangos-zero/database "mangos-zero database"
+
+[20]: http://pear.php.net/ "PEAR - PHP Extension and Application Repository"
+[21]: http://pear.php.net/package/Console_CommandLine "PEAR Console_CommandLine"
+[22]: http://pear.php.net/package/MDB2 "PEAR MDB2"
+[23]: http://pear.php.net/package/MDB2_Driver_mysqli "PEAR MDB2_Driver_mysqli"
+
+[50]: http://eu.blizzard.com/en-gb/games/wow/ "World of Warcraft"
+
+[100]: https://github.com/nvie/gitflow "git-flow"
+[101]: http://nvie.com/posts/a-successful-git-branching-model/ "A successful git branching model"
