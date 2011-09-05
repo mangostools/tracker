@@ -20,6 +20,9 @@ To use this application, a working PHP 5.3 installation for both the command
 line and web usage is mandatory.  [PEAR][20] is used for common tasks such as
 [command line][21] functions and [database connectivity][22].
 
+Development of **mangos-zero-tracker** requires the [git flow][100] extension
+installed, since development of this projects uses [this workflow][101] model.
+
 
 Installation
 ------------
