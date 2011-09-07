@@ -24,6 +24,12 @@ $clientBuild = '5875';
 $clientVersion = '1.12.1';
 
 /**
+ * The locale of the World of Warcraft client needed
+ *
+ * @var     string
+ */
+$clientLocale = 'en_US';
+/**
  * The directory where the DBC cache files are available
  *
  * @var     string
