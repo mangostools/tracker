@@ -7,6 +7,17 @@ and 1.12.2 (build 6005).
 It is used to validate content in the *mangos-zero* database against _DBC_
 default values extracted by a [PEAR][20] based command line utility.
 
+Development
+-----------
+The **develop** branch is where the development of *mangos-zero tracker* is
+done. Any of the commits submitted here may or may not become part of the next
+release.
+
+It is recommended to use the **master** branch for stable systems, and only use
+the **develop** branch if you intend to test commits and submit issues and/or
+reports.
+
+
 Compatibility
 -------------
 This database is compatible with *mangos-zero z1762*, and requires DBC files
