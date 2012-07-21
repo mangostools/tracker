@@ -78,7 +78,7 @@ $statuscolor = Array(
     "blue",
     "gray");
 
-$udbversion = Array("001", "002", "003");
+$udbversion = Array("1.0.0-dev");
 $c_udbversion = count($udbversion) - 1;
 $show_data_for_rev = isset($_GET["showrev"]) ? $_GET["showrev"] : "any";
 
@@ -99,7 +99,7 @@ if (isset($_GET["deletepost"]) && is_numeric($_GET["deletepost"])) {
         mysql_query("DELETE FROM $udbviewdb.status WHERE id = " . $_GET["deletepost"]);
 }
 if (isset($_GET["doreport"]) && is_numeric($quest) && isset($_POST["rev"]) && $_POST["rev"] != -1 && !empty($_POST["report"]) && isset($_SESSION["id"])) {
-    mysql_query("INSERT INTO $udbviewdb.status (quest_id, user, udbver, status, report, ts) VALUES ($quest, " . $_SESSION["id"] . ", " . $udbversion[$_POST["rev"]] . ", " . $_POST["status"] . ", \"" . mysql_real_escape_string($_POST["report"]) . "\", " . time() . " )") or die(mysql_error());
+    mysql_query("INSERT INTO $udbviewdb.status (quest_id, user, udbver, status, report, ts) VALUES ($quest, " . $_SESSION["id"] . ", \"" . mysql_real_escape_string($_POST["rev"]) . "\", \"" . mysql_real_escape_string($_POST["status"]) . "\", \"" . mysql_real_escape_string($_POST["report"]) . "\", " . time() . " )") or die(mysql_error());
 }
 
 
@@ -154,7 +154,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
 }
 ?>
 <html>
-    <head><title>UDB Quest Trac - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
+    <head><title>&quot;mangos-zero&quot; Quest Tracker - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
         <script type="text/javascript" src="http://static.wowhead.com/widgets/power.js"></script>
         <style>
             body, td, div { font-family:Helvetica,Arial,sans-serif; font-size:12px;}
@@ -178,8 +178,8 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    padding: 4px 2px;
                    text-align:right;
             }
-            .bar{width:100px;height:12px;padding:0px;margin:0px 5px;border:1px black solid;background-color:red;float:left}
-            .green{height:12px;padding:0px;margin:0px;border:0px black solid;background-color:green}
+            .bar{width:100px;height:12px;padding:0;margin:0 5px;border:1px black solid;background-color:red;float:left}
+            .green{height:12px;padding:0;margin:0;border:0 black solid;background-color:green}
             .tag0 {background-color:black;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
             .tag1 {background-color:red;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
             .tag2 {background-color:brown;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
@@ -997,7 +997,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    $temp = "";
                    $sql = mysql_query("SELECT id, user, udbver, report, status, ts FROM $udbviewdb.status WHERE quest_id=" . $quest);
                    while ($row = mysql_fetch_assoc($sql)) {
-                       $temp.="<tr><td>" . $row["udbver"] . "</td><td><span style=color:" . $statuscolor[$row["status"]] . ">" . $status[$row["status"]] . "</span></td><td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . " by " . id2nick($row["user"]) . "</i>";
+                       $temp.="<tr><td>" . $udbversion[$row["udbver"]] . "</td><td><span style=color:" . $statuscolor[$row["status"]] . ">" . $status[$row["status"]] . "</span></td><td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . " by " . id2nick($row["user"]) . "</i>";
                        if (isset($_SESSION["id"]) && $row["user"] == $_SESSION["id"])
                            $temp .=" - <a href=index.php?showrev=$show_data_for_rev&filterstatus=$filter_status&quest=$quest&deletepost=" . $row["id"] . ">delete</a>";
                        $temp .="</td></tr>";
