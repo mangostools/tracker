@@ -288,7 +288,7 @@ CREATE TABLE `users` (
   `id` int(5) unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(30) NOT NULL,
   `password` varchar(32) NOT NULL,
-  `lastlogin` int(10) NOT NULL,
+  `lastlogin` int(10) NOT NULL DEFAULT '0',
   `power` tinyint(3) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
