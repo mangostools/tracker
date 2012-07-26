@@ -260,7 +260,7 @@ CREATE TABLE `status` (
   `id` int(5) unsigned NOT NULL AUTO_INCREMENT,
   `quest_id` int(6) unsigned NOT NULL,
   `user` int(11) NOT NULL,
-  `udbver` int(4) NOT NULL,
+  `dbver` int(4) NOT NULL,
   `report` text NOT NULL,
   `status` tinyint(1) NOT NULL,
   `ts` int(10) NOT NULL,
@@ -301,6 +301,9 @@ CREATE TABLE `users` (
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
+INSERT INTO `users` (`id`, `name`, `password`, `lastlogin`, `power`) VALUES
+(1, 'admin', 'ae2aeb935c2a8c7a80fb116093ef35ca', 0, 100);
+
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
