@@ -163,6 +163,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
             table.main
             {
                 border:1px #888 solid;
+                border-collapse:collapse;
             }
             table.main tr td
             {
@@ -170,16 +171,19 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                 padding: 4px 2px;
             }
             td {border:0px red dotted;}
-            .breadcrumbs{background-color:#ddd;
-                         border:1px #888 solid;
-                         padding: 4px 2px;}
+
+            .breadcrumbs
+            {
+                background-color:#ddd;
+                border:1px #888 solid;
+                padding: 4px 2px;
+            }
             .login{background-color:#ddd;
                    border:1px #888 solid;
                    padding: 4px 2px;
                    text-align:right;
             }
-            .bar{width:100px;height:12px;padding:0;margin:0 5px;border:1px black solid;background-color:red;float:left}
-            .green{height:12px;padding:0;margin:0;border:0 black solid;background-color:green}
+
             .tag0 {background-color:black;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
             .tag1 {background-color:red;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
             .tag2 {background-color:brown;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
