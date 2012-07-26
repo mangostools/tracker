@@ -3,8 +3,8 @@
 require("config.php");
 ini_set('memory_limit', '512M');
 
-mysql_connect($server, $user, $password, $udbviewdb);
-mysql_select_db($udbviewdb);
+mysql_connect($server, $user, $password, $trackerdb);
+mysql_select_db($trackerdb);
 
 /**
  * The list of DBC files to be parsed.

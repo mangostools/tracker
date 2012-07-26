@@ -1,7 +1,7 @@
 <?php
 
 $mangosdb = "zp_world";
-$udbviewdb = "zp_tracker";
+$trackerdb = "zp_tracker";
 
 $server = "localhost";
 $user = "zp";
