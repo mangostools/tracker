@@ -1,4 +1,5 @@
 <?php
+define("mainfile",1);
 require_once("config.php");
 $map = !isset($_GET['map']) ? "x" : $_GET['map'];
 $areasort = empty($_GET['areasort']) ? "x" : $_GET['areasort'];
@@ -96,19 +97,6 @@ $login = "<a href=index.php?login>Log In</a> | <a href=index.php?reg>Register</a
 session_start();
 
 
-if (isset($_GET["dologout"])) {
-    unset($_SESSION);
-}
-if (isset($_GET["deletepost"]) && is_numeric($_GET["deletepost"])) {
-    $u = mysql_result(mysql_query("SELECT user FROM $trackerdb.status WHERE id =" . $_GET["deletepost"]), 0);
-    if ($u == $_SESSION["id"])
-        mysql_query("DELETE FROM $trackerdb.status WHERE id = " . $_GET["deletepost"]);
-}
-if (isset($_GET["doreport"]) && is_numeric($quest) && isset($_POST["rev"]) && $_POST["rev"] != -1 && !empty($_POST["report"]) && isset($_SESSION["id"])) {
-    mysql_query("INSERT INTO $trackerdb.status (quest_id, user, dbver, status, report, ts) VALUES ($quest, " . $_SESSION["id"] . ", \"" . mysql_real_escape_string($_POST["rev"]) . "\", \"" . mysql_real_escape_string($_POST["status"]) . "\", \"" . mysql_real_escape_string($_POST["report"]) . "\", " . time() . " )") or die(mysql_error());
-}
-
-
 if (isset($_GET["doreg"])) {
     if (!empty($_POST["username"]) && !empty($_POST["password"]) && !empty($_POST["password2"]) && strlen($_POST["username"]) > 3 && strlen($_POST["password"]) > 3 && $_POST["password"] == $_POST["password2"]) {
         mysql_query("INSERT INTO $trackerdb.users (`name`, `password`, `power`) VALUES (\"" . mysql_real_escape_string($_POST["username"]) . "\", \"" . md5($_POST["password"]) . "\", 1)") or die(mysql_error());
@@ -150,14 +138,43 @@ if (isset($_GET["login"])) {
         </fieldset></center></form>";
     die();
 }
+if (isset($_GET["dologout"])) {
+    unset($_SESSION);
+}
 
 if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
     $sql = mysql_query("SELECT COUNT(id) FROM $trackerdb.users WHERE id=" . $_SESSION["id"] . " AND MD5(CONCAT( `password` , `lastlogin` )) = \"" . $_SESSION["hash"] . "\"") or die(mysql_error());
     if (mysql_result($sql, 0) == 1)
-        $login = "Logged in as " . mysql_result(mysql_query("SELECT name FROM $trackerdb.users WHERE id=" . $_SESSION["id"]), 0) . " (<a href=index.php?dologout>Log Out</a>)";
+    {
+        $login = "Logged in as " . id2nick($_SESSION["id"]) . " (<a href=index.php?dologout>Log Out</a>)";
+        $power = mysql_result(mysql_query("SELECT power FROM $trackerdb.users WHERE id = ".$_SESSION["id"] ),0);
+        if($power == 100)
+          $login = "<a href=?admin_start>Administration</a> | ".$login;
+    }
     else
         unset($_SESSION);
 }
+
+//At this point we can do stuff that requires a valid session
+
+if (isset($_GET["deletepost"]) && is_numeric($_GET["deletepost"])) {
+    $u = mysql_result(mysql_query("SELECT user FROM $trackerdb.status WHERE id =" . $_GET["deletepost"]), 0);
+    if ($u == $_SESSION["id"])
+        mysql_query("DELETE FROM $trackerdb.status WHERE id = " . $_GET["deletepost"]);
+}
+if (isset($_GET["doreport"]) && is_numeric($quest) && isset($_POST["rev"]) && $_POST["rev"] != -1 && !empty($_POST["report"]) && isset($_SESSION["id"])) {
+    mysql_query("INSERT INTO $trackerdb.status (quest_id, user, dbver, status, report, ts) VALUES ($quest, " . $_SESSION["id"] . ", \"" . mysql_real_escape_string($_POST["rev"]) . "\", \"" . mysql_real_escape_string($_POST["status"]) . "\", \"" . mysql_real_escape_string($_POST["report"]) . "\", " . time() . " )") or die(mysql_error());
+}
+
+if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
+    $power = mysql_result(mysql_query("SELECT power FROM $trackerdb.users WHERE id = ".$_SESSION["id"] ),0);
+    if($power == 100)
+      include("admin.php");
+    die();
+}
+
+
+
 ?>
 <html>
     <head>
@@ -399,7 +416,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       if (is_numeric($filter_status)) {
                           $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (SELECT id FROM $trackerdb.areatable WHERE map = " . $row["map"] . ")) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
                           if ($working != 0)
-                              echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
+                              echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td><td></td></tr>";
                       }
                       else {
                           $temp = "";
