@@ -57,7 +57,7 @@ $problems = Array(
 
 $status = Array(
     "Unknown", //0
-    "Cot completable", //1
+    "Not completable", //1
     "Core issue", //2
     "Script issue", //3
     "DB issue", //4
@@ -154,12 +154,15 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
 }
 ?>
 <html>
-    <head><title>&quot;mangos-zero&quot; Quest Tracker - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
+    <head>
+        <title>&quot;mangos-zero&quot; Quest Tracker - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
         <script type="text/javascript" src="http://static.wowhead.com/widgets/power.js"></script>
         <style>
             body, td, div { font-family:Helvetica,Arial,sans-serif; font-size:12px;}
             ul,li{margin:2px}
-            legend{font-weight:bold;text-decoration:underline;font-size:13px;}
+            legend{font-weight:bold;text-decoration:none;font-size:13px;padding:2px; border:1px black solid}
+            fieldset {margin:8px 0px}
+            a {text-decoration:none}
             table.main
             {
                 border:1px #888 solid;
@@ -183,22 +186,26 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    padding: 4px 2px;
                    text-align:right;
             }
+            .tag {font-weight:bold; padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
 
-            .tag0 {background-color:black;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag1 {background-color:red;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag2 {background-color:brown;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag3 {background-color:orange;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag4 {background-color:darkcyan;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag5 {background-color:green;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag6 {background-color:blue;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
-            .tag7 {background-color:#777;color:white;padding:1px 3px;border-radius: 5px;-moz-border-radius: 5px;}
+            .tag_alliance {background-color:blue;    color:yellow;  border-color: yellow;  border-width:2px; border-style:solid}
+            .tag_horde    {background-color:#3f2d1d; color:#c92300; border-color: #929292; border-width:2px; border-style:solid}
+            .tag_gray     {background-color:#ddd;    color:#eee;    border-color: #eee;    border-width:2px; border-style:solid}
+
+            .tag0 {background-color:black;      color:white;}
+            .tag1 {background-color:red;        color:white;}
+            .tag2 {background-color:brown;      color:white;}
+            .tag3 {background-color:orange;     color:white;}
+            .tag4 {background-color:darkcyan;   color:white;}
+            .tag5 {background-color:green;      color:white;}
+            .tag6 {background-color:blue;       color:white;}
+            .tag7 {background-color:#777;       color:white;}
 
 
         </style>
     </head>
     <body>
-        <table cellspacing=0 style="width:99%" <?php if (!is_numeric($quest))
-    echo "class=main"; ?>>
+        <table cellspacing=0 style="width:99%" <?php if (!is_numeric($quest)) echo "class=main"; ?>>
                <?php
                $search_form = "<form action=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&search method=post style=\"margin:0px;display:inline;\"><input name=query style=width:150px value=\"$query\"><input type=submit value=\"Search\"></form>";
 
@@ -272,7 +279,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    echo "<tr><td colspan=2>Quest</td><td colspan=2>Problems</td></tr>";
                    if ($count == 0) {
                        echo "<tr><td colspan=4>No entries found</td></tr>";
-                       continue;
+                       die();
                    }
                    $sql = mysql_query("SELECT entry, problem FROM $trackerdb.problems WHERE entry NOT IN (SELECT quest_id FROM $trackerdb.status) ORDER BY entry ASC LIMIT $offset, 50");
                    while ($row = mysql_fetch_array($sql)) {
@@ -301,7 +308,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    echo "<tr><td>Quest</td><td>User</td><td>Status</td><td>Report</td></tr>";
                    if ($count == 0) {
                        echo "<tr><td colspan=4>No entries found</td></tr>";
-                       continue;
+                       die();
                    }
                    $sql = mysql_query("SELECT quest_id, dbver, user, report, status, ts FROM $trackerdb.status WHERE 1 $dbver $filter ORDER BY ts DESC LIMIT $offset, 50");
                    while ($row = mysql_fetch_array($sql)) {
@@ -333,7 +340,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    $percent_completable = round((($working[5] + $working[6]) / $anz) * 100, 2);
                    $percent_not_completable = round(($working[1] / $anz) * 100, 2);
                    $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                   echo "<tr><td>All Quests</td><td>$anz total</td><td>" . $temp . "</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td></tr>";
+                   echo "<tr><td>All Quests</td><td>$anz total</td><td>" . $temp . "</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
 
 
                    $sql = "SELECT count( mq.entry ) as anz , ua.map, um.name, um.type FROM $mangosdb.quest_template AS mq, $trackerdb.areatable AS ua, $trackerdb.map AS um WHERE mq.ZoneOrSort >0 AND mq.ZoneOrSort = ua.id AND ua.map = um.id GROUP BY um.id ASC ORDER BY um.type, ua.map ASC";
@@ -374,7 +381,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                            $percent_completable = round((($working[5] + $working[6]) / $row["anz"]) * 100, 2);
                            $percent_not_completable = round(($working[1] / $row["anz"]) * 100, 2);
                            $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                           echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td>$temp</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td>";
+                           echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
                        }
                    }
                    echo "<tr><td colspan=4 style=background-color:#eee>Other</td></tr>";
@@ -402,7 +409,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                        $percent_not_completable = round(($working[1] / $profession) * 100, 2);
                        $percent_unknown = 100 - $percent_not_completable - $percent_completable;
 
-                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Profession</a></td><td>" . $profession . "</td><td>$temp</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td>";
+                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Profession</a></td><td>" . $profession . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
                    }
 
 
@@ -426,7 +433,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                        $percent_completable = round((($working[5] + $working[6]) / $class) * 100, 2);
                        $percent_not_completable = round(($working[1] / $class) * 100, 2);
                        $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Class</a></td><td>" . $class . "</td><td>$temp</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td>";
+                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Class</a></td><td>" . $class . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
                    }
 
                    $event = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")"), 0) or die(mysql_error());
@@ -449,7 +456,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                        $percent_completable = round((($working[5] + $working[6]) / $event) * 100, 2);
                        $percent_not_completable = round(($working[1] / $event) * 100, 2);
                        $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Event</a></td><td>" . $event . "</td><td>$temp</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td>";
+                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Event</a></td><td>" . $event . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
                    }
 
                    $other = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort =0"), 0) or die(mysql_error());
@@ -472,7 +479,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                        $percent_completable = round((($working[5] + $working[6]) / $other) * 100, 2);
                        $percent_not_completable = round(($working[1] / $other) * 100, 2);
                        $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u&areasort=0>Other/Unknown</a></td><td>" . $other . "</td><td>$temp</td><td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td></tr>";
+                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u&areasort=0>Other/Unknown</a></td><td>" . $other . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
                    }
                }
                if ($areasort == "x" && $quest == "x" && is_numeric($map) && mysql_result(mysql_query("SELECT COUNT(id) FROM $trackerdb.areatable WHERE map = $map"), 0) == 1)
@@ -524,7 +531,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                            echo "<tr>
 			  <td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map&areasort=" . $row["ZoneOrSort"] . ">" . $row["name"] . "</a></td>
 			  <td>" . $row["anz"] . "</td><td>$temp</td>
-			  <td><span class=tag5 title=completable>$percent_completable %</span> <span class=tag1 title=\"not completable\">$percent_not_completable %</span> <span class=tag0 title=\"unknown\">$percent_unknown %</span></td></tr>";
+			  <td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
                        }
                    }
                }
@@ -561,21 +568,20 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    }
                    echo "</td><td class=login>$login</td></tr>";
 
-                   $result = mysql_query("SELECT m.entry, m.Title FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
+                   $result = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
+
                    while ($row = mysql_fetch_assoc($result)) {
-                       $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $database_version[$c_database_version] . " GROUP BY status ASC, dbver DESC");
-                       if (is_numeric($filter_status)) {
-                           while ($row2 = mysql_fetch_array($res2)) {
-                               if ($row2["status"] == $filter_status) {
-                                   echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a></td><td><span style=color:" . $statuscolor[$row2["status"]] . ">" . $status[$row2["status"]] . " in " . $row2["dbver"] . "</span></td></tr>";
-                               }
-                           }
-                       } else {
-                           $queststatus = "&nbsp;";
-                           while ($row2 = mysql_fetch_array($res2))
-                               $queststatus.="<span class=\"tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $row2["dbver"] . "</span> ";
-                           echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a></td><td>" . $queststatus . "</td></tr>";
-                       }
+                       $statusfilter = is_numeric($filter_status) ? " AND status = $filter_status " : "";
+                       $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
+                       $queststatus = "";
+                       while ($row2 = mysql_fetch_array($res2))
+                           $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $row2["dbver"] . "</span> ";
+                       if(is_numeric($filter_status) && empty($queststatus))
+                           continue;
+                       $side_a = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 1101) ? "tag_alliance" : "tag_gray";
+                       $side_h = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 690) ? "tag_horde" : "tag_gray";
+
+                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . $queststatus . "</td></tr>";
                    }
                } elseif (is_numeric($quest)) {
                    $row = mysql_fetch_assoc(mysql_query("SELECT * FROM $mangosdb.quest_template WHERE entry = $quest"));
@@ -1011,7 +1017,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                    echo empty($temp) ? "<tr><td colspan=3><center>No entries</center></td></tr>" : $temp;
                    if (isset($_SESSION["id"]) && $_SESSION["id"] > 0) {
                        echo "<tr><td colspan=3><b>File a new Report</b></br><form action=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=$quest&doreport method=post>
-	      <tt>UDB rev&nbsp;</tt><select name=rev style=width:350px><option value=-1>don't know</option>";
+	      <tt>DB rev&nbsp;&nbsp;</tt><select name=rev style=width:350px><option value=-1>don't know</option>";
                        for ($i = 0; $i < count($database_version); $i++)
                            echo "<option value=$i>$database_version[$i]</option>";
                        echo "</select> Your Report won't submit if you don't know your DB rev!</br> <tt>Status&nbsp;&nbsp;</tt><select name=status style=width:350px>";
