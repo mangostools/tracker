@@ -78,12 +78,18 @@ $statuscolor = Array(
     "blue",
     "gray");
 
-$database_version = Array("1.0.0-dev");
-$c_database_version = count($database_version) - 1;
-$show_data_for_rev = isset($_GET["showrev"]) ? $_GET["showrev"] : "any";
-
 mysql_connect($server, $user, $password, $mangosdb);
 mysql_select_db($mangosdb);
+
+
+$database_version = Array();
+$sql = mysql_query("SELECT id, name FROM $trackerdb.revision ORDER BY id DESC") or die(mysql_error());
+while( $row = mysql_fetch_assoc($sql) )
+    $database_version[$row["id"]] = $row["name"];
+
+$c_database_version = mysql_result(mysql_query("SELECT MIN(id) FROM $trackerdb.revision"),0);
+$show_data_for_rev = isset($_GET["showrev"]) ? $_GET["showrev"] : "any";
+
 
 //Login Stuff
 $login = "<a href=index.php?login>Log In</a> | <a href=index.php?reg>Register</a>";
@@ -111,12 +117,12 @@ if (isset($_GET["doreg"])) {
 }
 if (isset($_GET["reg"])) {
     echo "<form action=index.php?doreg method=post>
-	  <center><fieldset style=width:300px><legend>Registration</legend>
-	  <tt>Username:      </tt> <input name=username style=\"width:250px\"></br>
-	  <tt>Password:      </tt> <input name=password type=password style=\"width:250px\">
-	  <tt>Password again:</tt> <input name=password2 type=password style=\"width:250px\">
-	  <center><input type=submit></center>
-	  </fieldset></center></form>";
+        <center><fieldset style=width:300px><legend>Registration</legend>
+        <tt>Username:      </tt> <input name=username style=\"width:250px\"></br>
+        <tt>Password:      </tt> <input name=password type=password style=\"width:250px\">
+        <tt>Password again:</tt> <input name=password2 type=password style=\"width:250px\">
+        <center><input type=submit></center>
+        </fieldset></center></form>";
     die();
 }
 
@@ -137,11 +143,11 @@ if (isset($_GET["dologin"])) {
 }
 if (isset($_GET["login"])) {
     echo "<form action=index.php?dologin method=post>
-	  <center><fieldset style=width:300px><legend>Log In</legend>
-	  <tt>Username:</tt> <input name=username style=\"width:250px\"></br>
-	  <tt>Password:</tt> <input name=password type=password style=\"width:250px\">
-	  <center><input type=submit></center>
-	  </fieldset></center></form>";
+        <center><fieldset style=width:300px><legend>Log In</legend>
+        <tt>Username:</tt> <input name=username style=\"width:250px\"></br>
+        <tt>Password:</tt> <input name=password type=password style=\"width:250px\">
+        <center><input type=submit></center>
+        </fieldset></center></form>";
     die();
 }
 
@@ -215,11 +221,17 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
               $select_status.="</select><input type=submit value=\"Change\"></form>  ";
 
               $select_rev = "<form action=index.php method=get style=\"margin:0px;display:inline;\"><input type=hidden name=filterstatus value=$filter_status><select name=showrev><option value=any " . ($show_data_for_rev == "any" ? "selected=selected" : "") . ">any revision</option>";
-              for ($i = 0; $i < count($database_version); $i++)
-                  $select_rev.="<option value=" . $database_version[$i] . " " . ($database_version[$i] == $show_data_for_rev ? "selected=selected" : "") . ">" . $database_version[$i] . "</option>";
+              foreach($database_version as $i => $db_version_name)
+                  $select_rev.="<option value=" . $i . " " . ($i == $show_data_for_rev ? "selected=selected" : "") . ">" . $db_version_name . "</option>";
               $select_rev.="</select><input type=submit value=\"Change\"></form>  ";
               $login = $search_form . " | " . $select_status . " | " . $select_rev . " | <a href=index.php?recent&showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">Recent entries</a> | <a href=index.php?problems&showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">Obvious Problems</a> | " . $login;
               echo "<tr><td class=breadcrumbs colspan=2><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">root</a>&nbsp;>>&nbsp;";
+
+              /**
+              *
+              * Search function
+              *
+              */
               if (isset($_GET["search"])) {
                   echo "Search results</td><td class=login>$login</td></tr>";
                   if (is_numeric($query)) {
@@ -231,10 +243,10 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                           echo "<tr><td>Quest ID</td><td>Name</td><td>Reported Status</td></tr>";
                           $sql = mysql_query("SELECT entry, Title FROM $mangosdb.quest_template WHERE entry = " . mysql_real_escape_string($query));
                           while ($row = mysql_fetch_assoc($sql)) {
-                              $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $database_version[$c_database_version] . " GROUP BY status ASC, dbver DESC");
+                              $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " GROUP BY status ASC, dbver DESC");
                               $queststatus = "";
                               while ($row2 = mysql_fetch_array($res2))
-                                  $queststatus.="<span style=color:" . $statuscolor[$row2["status"]] . ">" . $status[$row2["status"]] . " in " . $row2["dbver"] . "</span>; ";
+                                  $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
                               if (empty($queststatus))
                                   $queststatus = $status[0] . " in " . $database_version[0];
                               echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a></td><td>" . $queststatus . "</td></tr>";
@@ -250,22 +262,27 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       $count = mysql_result(mysql_query("SELECT COUNT(entry) FROM $mangosdb.quest_template WHERE Title LIKE \"%" . mysql_real_escape_string($query) . "%\""), 0);
                       if ($count == 0) {
                           echo "<tr><td colspan=4>No entries found</td></tr>";
-                          continue;
+                          die();
                       } else {
                           echo "<tr><td>Quest ID</td><td>Name</td><td>Reported Status</td></tr>";
                           $sql = mysql_query("SELECT entry, Title FROM $mangosdb.quest_template WHERE Title LIKE \"%" . mysql_real_escape_string($query) . "%\"");
                           while ($row = mysql_fetch_assoc($sql)) {
-                              $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $database_version[$c_database_version] . " GROUP BY status ASC, dbver DESC");
+                              $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " GROUP BY status ASC, dbver DESC");
                               $queststatus = "";
                               while ($row2 = mysql_fetch_array($res2))
-                                  $queststatus.="<span style=color:" . $statuscolor[$row2["status"]] . ">" . $status[$row2["status"]] . " in " . $row2["dbver"] . "</span>; ";
-                              if (empty($queststatus))
-                                  $queststatus = $status[0] . " in " . $database_version[0];
+                                  $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
                               echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a></td><td>" . $queststatus . "</td></tr>";
                           }
                       }
                   }
+                  die();
               }
+
+              /**
+              *
+              * Obvious Problems
+              *
+              */
               elseif (isset($_GET["problems"])) {
                   $count = mysql_result(mysql_query("SELECT COUNT(entry) FROM $trackerdb.problems WHERE entry NOT IN (SELECT quest_id FROM $trackerdb.status)"), 0);
                   echo "Obvious Problems ($count problems detected)</td><td class=login colspan=2>$login</td></tr>";
@@ -296,7 +313,14 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                   for ($i = 0; $i < $count; $i+=50)
                       echo "<a href=index.php?showrev=$show_data_for_rev&problems&offset=$i>" . ($i / 50 + 1) . "</a> ";
                   echo "</td></tr>";
+                  die();
               }
+
+              /**
+              *
+              * Recent entries
+              *
+              */
               elseif (isset($_GET["recent"])) {
                   echo "Recent Entries</td><td class=login colspan=2>$login</td></tr>";
 
@@ -310,12 +334,12 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       echo "<tr><td colspan=4>No entries found</td></tr>";
                       die();
                   }
-                  $sql = mysql_query("SELECT quest_id, dbver, user, report, status, ts FROM $trackerdb.status WHERE 1 $dbver $filter ORDER BY ts DESC LIMIT $offset, 50");
+                  $sql = mysql_query("SELECT quest_id, dbver, user, report, status, ts FROM $trackerdb.status WHERE 1 $dbver $filter AND dbver >= $c_database_version ORDER BY ts DESC LIMIT $offset, 50");
                   while ($row = mysql_fetch_array($sql)) {
                       echo "<tr>";
                       echo "<td><a href=index.php?showrev=$show_data_for_rev&quest=" . $row["quest_id"] . ">" . $row["quest_id"] . " - " . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry =" . $row["quest_id"]), 0) . "</a></td>";
                       echo "<td>" . mysql_result(mysql_query("SELECT name FROM $trackerdb.users WHERE id =" . $row["user"]), 0) . "</td>";
-                      echo "<td><span style=color:" . $statuscolor[$row["status"]] . ">" . $status[$row["status"]] . "</span> in " . $row["dbver"] . "</td>";
+                      echo "<td><span class=\"tag tag" . $row["status"] . "\" title=\"" . $status[$row["status"]] . "\">" . $database_version[$row["dbver"]] . "</span></td>";
                       echo "<td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . "</td>";
                       echo "</tr>";
                   }
@@ -323,12 +347,22 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                   for ($i = 0; $i < $count; $i+=50)
                       echo "<a href=index.php?showrev=$show_data_for_rev&recent&offset=$i>" . ($i / 50 + 1) . "</a> ";
                   echo "</td></tr>";
-              } elseif ($map == "x" && $areasort == "x" && $quest == "x") {
+                  die();
+              }
+
+              /**
+              *
+              * Map Selection
+              *
+              */
+              elseif ($map == "x" && $areasort == "x" && $quest == "x") {
                   echo "Map Selection</td><td class=login colspan=2>$login</td></tr>";
+
+                  //Total counts
                   echo "<tr><td colspan=4 style=background-color:#eee>Total Counts</td></tr>";
                   $anz = mysql_result(mysql_query("SELECT count(entry) from $mangosdb.quest_template"), 0);
                   $unknown = $anz - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                  ;
+
                   $temp = "";
                   $working = array();
                   for ($i = 1; $i < count($status); $i++) {
@@ -482,6 +516,13 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u&areasort=0>Other/Unknown</a></td><td>" . $other . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
                   }
               }
+                /**
+                *
+                * Zone selection
+                *
+                */
+
+              // Skip Zone Selection for maps with only one zone (Dungeons & BGs)
               if ($areasort == "x" && $quest == "x" && is_numeric($map) && mysql_result(mysql_query("SELECT COUNT(id) FROM $trackerdb.areatable WHERE map = $map"), 0) == 1)
                   $areasort = mysql_result(mysql_query("SELECT id FROM $trackerdb.areatable WHERE map = $map"), 0);
 
@@ -535,6 +576,11 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       }
                   }
               }
+                /**
+                *
+                * Quest selection
+                *
+                */
               elseif (is_numeric($areasort)) {
                   switch ($map) {
                       case "p":echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Professions</a>&nbsp;>>&nbsp;";
@@ -575,7 +621,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                       $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
                       $queststatus = "";
                       while ($row2 = mysql_fetch_array($res2))
-                          $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $row2["dbver"] . "</span> ";
+                          $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
                       if(is_numeric($filter_status) && empty($queststatus))
                           continue;
                       $side_a = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 1101) ? "tag_alliance" : "tag_gray";
@@ -583,7 +629,14 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
 
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . $queststatus . "</td></tr>";
                   }
-              } elseif (is_numeric($quest)) {
+              }
+
+                /**
+                *
+                * Quest View
+                *
+                */
+              elseif (is_numeric($quest)) {
                   $row = mysql_fetch_assoc(mysql_query("SELECT * FROM $mangosdb.quest_template WHERE entry = $quest"));
                   $areasort = $row["ZoneOrSort"];
                   switch ($areasort) {
@@ -1005,7 +1058,7 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                   echo "</tr></table></fieldset>";
 
                   $temp = "";
-                  $sql = mysql_query("SELECT id, user, dbver, report, status, ts FROM $trackerdb.status WHERE quest_id=" . $quest);
+                  $sql = mysql_query("SELECT id, user, dbver, report, status, ts FROM $trackerdb.status WHERE quest_id=" . $quest . " AND dbver >= " . $c_database_version);
                   while ($row = mysql_fetch_assoc($sql)) {
                       $temp.="<tr><td>" . $database_version[$row["dbver"]] . "</td><td><span style=color:" . $statuscolor[$row["status"]] . ">" . $status[$row["status"]] . "</span></td><td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . " by " . id2nick($row["user"]) . "</i>";
                       if (isset($_SESSION["id"]) && $row["user"] == $_SESSION["id"])
@@ -1018,8 +1071,8 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
                   if (isset($_SESSION["id"]) && $_SESSION["id"] > 0) {
                       echo "<tr><td colspan=3><b>File a new Report</b></br><form action=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=$quest&doreport method=post>
                             <tt>DB rev&nbsp;&nbsp;</tt><select name=rev style=width:350px><option value=-1>don't know</option>";
-                      for ($i = 0; $i < count($database_version); $i++)
-                          echo "<option value=$i>$database_version[$i]</option>";
+                      foreach($database_version as $i => $db_version_name)
+                          echo "<option value=$i>$db_version_name</option>";
                       echo "</select> Your Report won't submit if you don't know your DB rev!</br> <tt>Status&nbsp;&nbsp;</tt><select name=status style=width:350px>";
                       for ($i = 0; $i < count($status); $i++)
                           echo "<option value=$i>$status[$i]</option>";

@@ -305,6 +305,27 @@ INSERT INTO `users` (`id`, `name`, `password`, `lastlogin`, `power`) VALUES
 (1, 'admin', 'ae2aeb935c2a8c7a80fb116093ef35ca', 0, 100);
 
 UNLOCK TABLES;
+
+--
+-- Table structure for table `revision`
+--
+DROP TABLE IF EXISTS `revision`;
+
+CREATE TABLE `revision` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(20) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=2 ;
+
+--
+-- Dumping data for table `revision`
+--
+
+INSERT INTO `revision` (`id`, `name`) VALUES
+(1, '1.0.0-dev');
+
+
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
