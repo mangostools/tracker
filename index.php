@@ -3,7 +3,6 @@ define("mainfile",1);
 require_once("config.php");
 $map = !isset($_GET['map']) ? "x" : $_GET['map'];
 $areasort = empty($_GET['areasort']) ? "x" : $_GET['areasort'];
-$areasort = ($map == "u") ? 0 : $areasort;
 $offset = empty($_GET['offset']) ? 0 : $_GET['offset'];
 $quest = empty($_GET['quest']) ? "x" : $_GET['quest'];
 $query = empty($_POST['query']) ? "Title or ID" : $_POST['query'];
@@ -23,6 +22,8 @@ function id2name($table, $id) {
 
 $zos_profession = "-24,-101,-121,-181,-182,-201,-264,-304,-324";
 $zos_class = "-61,-81,-82,-141,-161,-162,-261,-262,-263";
+
+$ALL_RACES = 255; //255 for vanilla, 1691 for >= TBC
 
 $quest_flags = Array(
     "QUEST_FLAGS_NONE", //0
@@ -48,6 +49,15 @@ $special_flags = Array(
     "QUEST_SPECIAL_FLAG_SPEAKTO", // 16
     "QUEST_SPECIAL_FLAG_KILL_OR_CAST", // 32
     "QUEST_SPECIAL_FLAG_TIMED", // 64
+);
+
+$map_types = Array(
+    -1 => "Total Counts",
+    0 => "Map",
+    1 => "Instance",
+    2 => "Raid",
+    3 => "BG",
+    999 => "Other"
 );
 
 $problems = Array(
@@ -184,7 +194,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
             body, td, div { font-family:Helvetica,Arial,sans-serif; font-size:12px;}
             ul,li{margin:2px}
             legend{font-weight:bold;text-decoration:none;font-size:13px;padding:2px; border:1px black solid}
-            fieldset {margin:8px 0px}
+            fieldset {margin:8px 2px}
             a {text-decoration:none}
             table.main
             {
@@ -375,162 +385,56 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
               elseif ($map == "x" && $areasort == "x" && $quest == "x") {
                   echo "Map Selection</td><td class=login colspan=2>$login</td></tr>";
 
-                  //Total counts
-                  echo "<tr><td colspan=4 style=background-color:#eee>Total Counts</td></tr>";
-                  $anz = mysql_result(mysql_query("SELECT count(entry) from $mangosdb.quest_template"), 0);
-                  $unknown = $anz - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-
-                  $temp = "";
-                  $working = array();
-                  for ($i = 1; $i < count($status); $i++) {
-                      $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      if ($working[$i] != 0)
-                          $temp .=" - <font color=" . $statuscolor[$i] . ">" . $working[$i] . " " . $status[$i] . "</font>";
+                  //Build the map list
+                  $list = Array();
+                  //First a total count
+                  $all = mysql_fetch_assoc(mysql_query("SELECT COUNT(entry) AS num,group_concat(DISTINCT ZoneOrSort SEPARATOR \",\") AS zones FROM $mangosdb.quest_template"));
+                  $list[] = Array("num"=>$all["num"], "zones"=>$all["zones"], "map"=>"x", "name"=>"All Quests", "type"=>-1);
+                  
+                  //Regular Maps, Instances, Raids, BGs
+                  $sql = mysql_query("SELECT count( mq.entry ) AS num, group_concat(DISTINCT mq.ZoneOrSort SEPARATOR \",\") AS zones, ta.map, tm.name, tm.type FROM $mangosdb.quest_template AS mq, $trackerdb.areatable AS ta, $trackerdb.map AS tm WHERE mq.ZoneOrSort >0 AND mq.ZoneOrSort = ta.id AND ta.map = tm.id GROUP BY tm.id ASC ORDER BY tm.type, ta.map ASC");
+                  while ($row = mysql_fetch_assoc($sql))
+                  {
+                      $list[] = $row;
                   }
-                  $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . " unknown</font>" . $temp;
-                  $percent_completable = round((($working[5] + $working[6]) / $anz) * 100, 2);
-                  $percent_not_completable = round(($working[1] / $anz) * 100, 2);
-                  $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                  echo "<tr><td>All Quests</td><td>$anz total</td><td>" . $temp . "</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
+                  //Profession, Class and Event quests need custom grouping
+                  $professions_count = mysql_result(mysql_query("SELECT COUNT(entry) AS num FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_profession . ")"),0);
+                  $list[] = Array("num"=>$professions_count, "zones"=>$zos_profession, "map"=>"p", "name"=>"Profession", "type"=>999);
+                  $class_count = mysql_result(mysql_query("SELECT COUNT(entry) AS num FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_class . ")"),0);
+                  $list[] = Array("num"=>$class_count, "zones"=>$zos_class, "map"=>"c", "name"=>"Class", "type"=>999);
+                  $event = mysql_fetch_assoc(mysql_query("SELECT COUNT(entry) AS num,group_concat(DISTINCT ZoneOrSort SEPARATOR \",\") AS zones FROM $mangosdb.quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")"),0);
+                  $list[] = Array("num"=>$event["num"], "zones"=>$event["zones"], "map"=>"e", "name"=>"Event", "type"=>999);
+                  $other_count = mysql_result(mysql_query("SELECT COUNT(entry) AS num FROM $mangosdb.quest_template WHERE ZoneOrSort = 0"),0);
+                  $list[] = Array("num"=>$other_count, "zones"=>0, "map"=>"u", "name"=>"Other/Unknown", "type"=>999);
 
-
-                  $sql = "SELECT count( mq.entry ) as anz , ua.map, um.name, um.type FROM $mangosdb.quest_template AS mq, $trackerdb.areatable AS ua, $trackerdb.map AS um WHERE mq.ZoneOrSort >0 AND mq.ZoneOrSort = ua.id AND ua.map = um.id GROUP BY um.id ASC ORDER BY um.type, ua.map ASC";
-                  $type = -1;
-                  $result = mysql_query($sql) or die(mysql_error());
-                  while ($row = mysql_fetch_assoc($result)) {
-                      if ($type != $row["type"]) {
-                          $type = $row["type"];
-                          switch ($type) {
-                              case 0:echo "<tr><td colspan=4 style=background-color:#eee>Map</td></tr>";
-                                  break;
-                              case 1:echo "<tr><td colspan=4 style=background-color:#eee>Instance</td></tr>";
-                                  break;
-                              case 2:echo "<tr><td colspan=4 style=background-color:#eee>Raid</td></tr>";
-                                  break;
-                              case 3:echo "<tr><td colspan=4 style=background-color:#eee>BG</td></tr>";
-                                  break;
-                              default:break;
-                          }
-                          echo "<tr><td>Map Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
+                  $prev_type = "";
+                  
+                  for ($i =0; $i < count($list); $i++)
+                  {
+                      $line = $list[$i];
+                      if($line["type"] != $prev_type)
+                      {
+                          $prev_type = $line["type"];
+                          echo "<tr><td colspan=4 style=background-color:#eee>".$map_types[$line["type"]]."</td></tr>";
+                          echo "<tr><td>Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
                       }
-                      if (is_numeric($filter_status)) {
-                          $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (SELECT id FROM $trackerdb.areatable WHERE map = " . $row["map"] . ")) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working != 0)
-                              echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td><td></td></tr>";
-                      }
-                      else {
-                          $temp = "";
-                          $unknown = $row["anz"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (SELECT id FROM $trackerdb.areatable WHERE map = " . $row["map"] . ")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          ;
-                          $working = array();
-                          for ($i = 1; $i < count($status); $i++) {
-                              $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (SELECT id FROM $trackerdb.areatable WHERE map = " . $row["map"] . ")) AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                              if ($working[$i] != 0)
-                                  $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
-                          }
-                          $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                          $percent_completable = round((($working[5] + $working[6]) / $row["anz"]) * 100, 2);
-                          $percent_not_completable = round(($working[1] / $row["anz"]) * 100, 2);
-                          $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                          echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $row["map"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
-                      }
-                  }
-                  echo "<tr><td colspan=4 style=background-color:#eee>Other</td></tr>";
-                  echo "<tr><td>Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
-
-
-                  $profession = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort IN (" . $zos_profession . ")"), 0) or die(mysql_error());
-                  if (is_numeric($filter_status)) {
-                      $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_profession . ")) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      if ($working != 0)
-                          echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Profession</a></td><td>" . $profession . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
-                  }
-                  else {
-                      $temp = "";
-                      $unknown = $profession - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_profession . ")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      ;
+                      $unknown = $line["num"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id IN (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (".$line["zones"].")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
+                      $track_status = "";
                       $working = array();
-                      for ($i = 1; $i < count($status); $i++) {
-                          $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_profession . ")) AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working[$i] != 0)
-                              $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
+                      for ($j = 1; $j < count($status); $j++) {
+                          $working[$j] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (".$line["zones"].")) AND status = $j AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
+                          if ($working[$j] != 0 && (!is_numeric($filter_status) || $filter_status==$j))
+                              $track_status .="/<font color=" . $statuscolor[$j] . ">" . $working[$j] . "</font>";
                       }
-                      $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                      $percent_completable = round((($working[5] + $working[6]) / $profession) * 100, 2);
-                      $percent_not_completable = round(($working[1] / $profession) * 100, 2);
+                      if(is_numeric($filter_status) && empty($track_status))
+                          continue;
+                      $track_status = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $track_status;
+                      $percent_completable = round((($working[5] + $working[6]) / $line["num"]) * 100, 2);
+                      $percent_not_completable = round(($working[1] / $line["num"]) * 100, 2);
                       $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Profession</a></td><td>" . $profession . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
-                  }
-
-
-                  $class = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort <0 AND ZoneOrSort IN (" . $zos_class . ")"), 0) or die(mysql_error());
-                  if (is_numeric($filter_status)) {
-                      $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_class . ")) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      if ($working != 0)
-                          echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Class</a></td><td>" . $class . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
-                  }
-                  else {
-                      $temp = "";
-                      $unknown = $class - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_class . ")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      ;
-                      $working = array();
-                      for ($i = 1; $i < count($status); $i++) {
-                          $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (" . $zos_class . ")) AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working[$i] != 0)
-                              $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
-                      }
-                      $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                      $percent_completable = round((($working[5] + $working[6]) / $class) * 100, 2);
-                      $percent_not_completable = round(($working[1] / $class) * 100, 2);
-                      $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Class</a></td><td>" . $class . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
-                  }
-
-                  $event = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")"), 0) or die(mysql_error());
-                  if (is_numeric($filter_status)) {
-                      $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      if ($working != 0)
-                          echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Event</a></td><td>" . $event . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
-                  }
-                  else {
-                      $temp = "";
-                      $unknown = $event - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      ;
-                      $working = array();
-                      for ($i = 1; $i < count($status); $i++) {
-                          $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort <0 AND ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ")) AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working[$i] != 0)
-                              $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
-                      }
-                      $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                      $percent_completable = round((($working[5] + $working[6]) / $event) * 100, 2);
-                      $percent_not_completable = round(($working[1] / $event) * 100, 2);
-                      $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Event</a></td><td>" . $event . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td>";
-                  }
-
-                  $other = mysql_result(mysql_query("SELECT COUNT(entry) AS anz FROM quest_template WHERE ZoneOrSort =0"), 0) or die(mysql_error());
-                  if (is_numeric($filter_status)) {
-                      $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =0) AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      if ($working != 0)
-                          echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u>Other/Unknown</a></td><td>" . $other . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
-                  }
-                  else {
-                      $temp = "";
-                      $unknown = $other - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =0) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                      ;
-                      $working = array();
-                      for ($i = 1; $i < count($status); $i++) {
-                          $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =0) AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working[$i] != 0)
-                              $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
-                      }
-                      $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                      $percent_completable = round((($working[5] + $working[6]) / $other) * 100, 2);
-                      $percent_not_completable = round(($working[1] / $other) * 100, 2);
-                      $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u&areasort=0>Other/Unknown</a></td><td>" . $other . "</td><td>$temp</td><td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
+                      $group_status = "<span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span>";
+                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $line["map"] . ">" . $line["name"] . "</a></td><td>" . $line["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
+                      
                   }
               }
                 /**
@@ -542,56 +446,55 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
               // Skip Zone Selection for maps with only one zone (Dungeons & BGs)
               if ($areasort == "x" && $quest == "x" && is_numeric($map) && mysql_result(mysql_query("SELECT COUNT(id) FROM $trackerdb.areatable WHERE map = $map"), 0) == 1)
                   $areasort = mysql_result(mysql_query("SELECT id FROM $trackerdb.areatable WHERE map = $map"), 0);
+              // same for "unknown/other"
+              if($map == "u")
+                  $areasort = 0;
 
-              if ($areasort === "x" && $quest == "x") {
+              if ($map !== "x" && $areasort === "x" && $quest == "x") {
                   if (is_numeric($map)) {
-                      $mapname = mysql_result(mysql_query("SELECT name FROM $trackerdb.map WHERE id = $map"), 0);
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a> >> Zone Selection</td><td class=login colspan=2>$login</td></tr>";
                       //zones
-                      echo "<tr><td>Zone Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
-                      $result = mysql_query("SELECT COUNT(m.entry) AS anz, m.ZoneOrSort,u.id, u.name FROM $mangosdb.quest_template as m, $trackerdb.areatable as u WHERE u.map=$map AND u.id = m.ZoneOrSort GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
+                      $mapname = mysql_result(mysql_query("SELECT name FROM $trackerdb.map WHERE id = $map"), 0);
+                      $selector = "Zone";
+                      $sql = mysql_query("SELECT COUNT(m.entry) AS num, m.ZoneOrSort,t.id, t.name FROM $mangosdb.quest_template as m, $trackerdb.areatable as t WHERE t.map=$map AND t.id = m.ZoneOrSort GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
                   } elseif ($map == "p") {
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Professions</a> >> Profession Selection</td><td class=login colspan=2>$login</td></tr>";
-                      echo "<tr><td>Profession</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
-                      //professions
-                      $result = mysql_query("SELECT COUNT(m.entry) AS anz, m.ZoneOrSort,u.id, u.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as u WHERE u.id = -1*m.ZoneOrSort AND m.ZoneOrSort IN (-24,-101,-121,-181,-182,-201,-264,-304,-324,-762,-371,-373) GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
+                       //professions
+                      $mapname = "Professions";
+                      $selector = "Profession";
+                      $sql = mysql_query("SELECT COUNT(m.entry) AS num, m.ZoneOrSort,t.id, t.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as t WHERE t.id = -1*m.ZoneOrSort AND m.ZoneOrSort IN (".$zos_profession.") GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
                   } elseif ($map == "c") {
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Classes</a> >> Class Selection</td><td class=login colspan=2>$login</td></tr>";
-                      echo "<tr><td>Class</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
-                      $result = mysql_query("SELECT COUNT(m.entry) AS anz, m.ZoneOrSort,u.id, u.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as u WHERE u.id = -1*m.ZoneOrSort AND m.ZoneOrSort IN (-61, -81, -82,-141,-161 , -162 ,-261 , -262 ,-263 , -372) GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
+                       //classes
+                      $mapname = "Classes";
+                      $selector = "Class";
+                      $sql = mysql_query("SELECT COUNT(m.entry) AS num, m.ZoneOrSort,t.id, t.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as t WHERE t.id = -1*m.ZoneOrSort AND m.ZoneOrSort IN (" . $zos_class . ") GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
                   } elseif ($map == "e") {
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Event</a> >> Event Selection</td><td class=login colspan=2>$login</td></tr>";
-                      echo "<tr><td>Event</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
-                      $result = mysql_query("SELECT COUNT(m.entry) AS anz, m.ZoneOrSort,u.id, u.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as u WHERE u.id = -1*m.ZoneOrSort AND m.ZoneOrSort NOT IN (-24,-101,-121,-181,-182,-201,-264,-304,-324,-762,-371,-373,-61, -81, -82,-141,-161 , -162 ,-261 , -262 ,-263 , -372) GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
+                       //events
+                      $mapname = "Events";
+                      $selector = "Event";
+                      $sql = mysql_query("SELECT COUNT(m.entry) AS num, m.ZoneOrSort,t.id, t.name FROM $mangosdb.quest_template as m, $trackerdb.questsort as t WHERE t.id = -1*m.ZoneOrSort AND m.ZoneOrSort NOT IN (" . $zos_class . "," . $zos_profession . ") GROUP BY m.ZoneOrSort ASC") or die(mysql_error());
                   } elseif ($map == "u") {
                       die("You should not have been able to come here...");
                   }
+                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a> >> $selector Selection</td><td class=login colspan=2>$login</td></tr>";
+                  echo "<tr><td>$selector</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
 
-                  while ($row = mysql_fetch_assoc($result)) {
-                      if (is_numeric($filter_status)) {
-                          $working = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =" . $row["ZoneOrSort"] . ") AND status = $filter_status AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          if ($working != 0)
-                              echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p&areasort=" . $row["ZoneOrSort"] . ">" . $row["name"] . "</a></td><td>" . $row["anz"] . "</td><td><font color=" . $statuscolor[$filter_status] . ">" . $working . "</font></td></tr>";
+                  while ($row = mysql_fetch_assoc($sql)) {//
+                      $unknown = $row["num"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id IN (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort = ".$row["ZoneOrSort"].") AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
+                      $track_status = "";
+                      $working = array();
+                      for ($j = 1; $j < count($status); $j++) {
+                          $working[$j] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort = ".$row["ZoneOrSort"].") AND status = $j AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
+                          if ($working[$j] != 0 && (!is_numeric($filter_status) || $filter_status==$j))
+                              $track_status .="/<font color=" . $statuscolor[$j] . ">" . $working[$j] . "</font>";
                       }
-                      else {
-                          $temp = "";
-                          $unknown = $row["anz"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =" . $row["ZoneOrSort"] . ") AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                          $working = Array();
-                          for ($i = 1; $i < count($status); $i++) {
-                              $working[$i] = mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id in (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort =" . $row["ZoneOrSort"] . ") AND status = $i AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
-                              if ($working[$i] != 0)
-                                  $temp .="/<font color=" . $statuscolor[$i] . ">" . $working[$i] . "</font>";
-                          }
-                          $temp = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $temp;
-                          $percent_completable = round((($working[5] + $working[6]) / $row["anz"]) * 100, 2);
-                          $percent_not_completable = round(($working[1] / $row["anz"]) * 100, 2);
-                          $percent_unknown = 100 - $percent_not_completable - $percent_completable;
-                          echo "<tr>
-            <td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map&areasort=" . $row["ZoneOrSort"] . ">" . $row["name"] . "</a></td>
-            <td>" . $row["anz"] . "</td><td>$temp</td>
-            <td><span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span></td></tr>";
-                      }
-                  }
+                      if(is_numeric($filter_status) && empty($track_status))
+                          continue;
+                      $track_status = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $track_status;
+                      $percent_completable = round((($working[5] + $working[6]) / $row["num"]) * 100, 2);
+                      $percent_not_completable = round(($working[1] / $row["num"]) * 100, 2);
+                      $percent_unknown = 100 - $percent_not_completable - $percent_completable;
+                      $group_status = "<span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span>";
+                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $map . "&areasort=".$row["ZoneOrSort"].">" . $row["name"] . "</a></td><td>" . $row["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
+                  }//
               }
                 /**
                 *
@@ -599,41 +502,37 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                 *
                 */
               elseif (is_numeric($areasort)) {
-                  switch ($map) {
-                      case "p":echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=p>Professions</a>&nbsp;>>&nbsp;";
-                          break;
-                      case "c":echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=c>Classes</a>&nbsp;>>&nbsp;";
-                          break;
-                      case "e":echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=e>Events</a>&nbsp;>>&nbsp;";
-                          break;
-                      case "u":echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u>Unknown</a>&nbsp;>>&nbsp;";
-                          break;
-                      default: {
-                              if ($areasort > 0) {
-                                  $res = mysql_query("SELECT m.id, m.name FROM $trackerdb.map as m,$trackerdb.areatable as a WHERE m.id = a.map AND a.id=$areasort");
-                                  $map = mysql_fetch_assoc($res);
-                                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $map["id"] . ">" . $map["name"] . "</a>&nbsp;>>&nbsp;";
-                              }
-                              if ($areasort < 0) {
-                                  $mapname = in_array($areasort, explode(",", $zos_profession)) ? Array("Professions", "p") : (in_array($areasort, explode(",", $zos_class)) ? Array("Classes", "c") : Array("Events", "e"));
-                                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $mapname[1] . ">" . $mapname[0] . "</a>&nbsp;>>&nbsp;";
-                              }
-                          }
-                          break;
-                  }
                   if ($areasort > 0) {
-                      $mapname = mysql_result(mysql_query("SELECT a.name FROM $trackerdb.areatable as a WHERE a.id=$areasort"), 0);
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$mapname</a>&nbsp;>>&nbsp;";
+                      $res = mysql_fetch_assoc(mysql_query("SELECT a.name as areaname, m.id, m.name as mapname FROM $trackerdb.map as m,$trackerdb.areatable as a WHERE m.id = a.map AND a.id=$areasort"));
+                      $areaname = $res["areaname"];
+                      $map = $res["id"];
+                      $mapname = $res["mapname"];
+                      
                   }
                   if ($areasort < 0) {
-                      $mapname = mysql_result(mysql_query("SELECT a.name FROM $trackerdb.questsort as a WHERE a.id=-1*$areasort"), 0);
-                      echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$mapname</a>&nbsp;>>&nbsp;";
+                      if(in_array($areasort, explode(",", $zos_profession)))
+                      {
+                        $map = "p";
+                        $mapname = "Professions";
+                      }
+                      elseif(in_array($areasort, explode(",", $zos_profession)))
+                      {
+                        $map = "c";
+                        $mapname = "Classes";
+                      }
+                      else
+                      {
+                        $map = "e";
+                        $mapname = "Events";
+                      }
+                      $areaname = mysql_result(mysql_query("SELECT a.name FROM $trackerdb.questsort as a WHERE a.id=-1*$areasort"), 0);
                   }
-                  echo "</td><td class=login>$login</td></tr>";
+                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a>&nbsp;>>&nbsp;<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$areaname</a>&nbsp;>>&nbsp;</td><td class=login>$login</td></tr>";
 
-                  $result = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
+                  
+                  $sql = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
 
-                  while ($row = mysql_fetch_assoc($result)) {
+                  while ($row = mysql_fetch_assoc($sql)) {
                       $statusfilter = is_numeric($filter_status) ? " AND status = $filter_status " : "";
                       $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
                       $queststatus = "";
@@ -655,13 +554,14 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                 */
               elseif (is_numeric($quest)) {
                   $row = mysql_fetch_assoc(mysql_query("SELECT * FROM $mangosdb.quest_template WHERE entry = $quest"));
+                  
+                  //We must backcalculate the breadcrumbs
                   $areasort = $row["ZoneOrSort"];
                   switch ($areasort) {
                       case 0:echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=u>Unknown</a>&nbsp;>>&nbsp;";
                           break;
                       case $row["ZoneOrSort"] > 0: {
-                              $res = mysql_query("SELECT m.id, m.name FROM $trackerdb.map as m,$trackerdb.areatable as a WHERE m.id = a.map AND a.id=$areasort");
-                              $map = mysql_fetch_assoc($res);
+                              $map = mysql_fetch_assoc(mysql_query("SELECT m.id, m.name FROM $trackerdb.map as m,$trackerdb.areatable as a WHERE m.id = a.map AND a.id=$areasort"));
                               echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $map["id"] . ">" . $map["name"] . "</a>&nbsp;>>&nbsp;";
                           }break;
                       case $row["ZoneOrSort"] < 0: {
@@ -679,14 +579,22 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$mapname</a>&nbsp;>>&nbsp;";
                   }
                   echo "Quest " . $quest . " - " . $row["Title"] . "</td><td class=login>$login</td></tr>";
+                  //end breadcrumbs
+                  
                   echo "<tr><td colspan=3>";
+                  
                   echo "<fieldset><legend>General Information</legend>";
+                  
                   echo "<b>Quest ID:</b> " . $row["entry"] . "</br>";
-                  echo "<b>Title:</b> <a href=\"http://old.wowhead.com/quest=" . $quest . "\" target=_blank>" . htmlentities($row["Title"]) . "</a></br>";
+                  
+                  echo "<b>Title:</b> <a href=\"http://old.wowhead.com/quest=" . $row["entry"] . "\" target=_blank>" . htmlentities($row["Title"]) . "</a></br>";
+                  
                   $questtype = $row["Type"] == 0 ? "none" : mysql_result(mysql_query("SELECT name FROM $trackerdb.questinfo WHERE id=" . $row["Type"]), 0);
                   echo "<b>Quest Type:</b> " . $questtype . "</br>";
+                  
                   if ($row["SuggestedPlayers"] > 0)
                       echo "Suggested Players: " . $row["SuggestedPlayers"] . "</br>";
+                  
                   echo "<b>Quest Start:</b> ";
                   if (mysql_result(mysql_query("SELECT COUNT(id) FROM $mangosdb.creature_questrelation WHERE quest=" . $quest), 0) > 0) {
                       $creature_id = mysql_result(mysql_query("SELECT id FROM $mangosdb.creature_questrelation WHERE quest=" . $quest), 0);
@@ -702,6 +610,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   else
                       echo "---";
                   echo "</br>";
+                  
                   echo "<b>Quest End:</b> ";
                   if (mysql_result(mysql_query("SELECT COUNT(id) FROM $mangosdb.creature_involvedrelation WHERE quest=" . $quest), 0) > 0) {
                       $creature_id = mysql_result(mysql_query("SELECT id FROM $mangosdb.creature_involvedrelation WHERE quest=" . $quest), 0);
@@ -711,34 +620,44 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   else
                       echo "---";
                   echo "</br>";
+                  
                   if ($row["PointX"] != 0 && $row["PointY"] != 0)
                       echo "<b>Point of Interest:</b> " . mysql_result(mysql_query("SELECT name FROM $trackerdb.map WHERE id=" . $row["PointMapId"]), 0) . " (X:" . $row["PointX"] . " - Y:" . $row["PointY"] . ")</br>";
                   echo "</fieldset>";
 
                   echo "<fieldset><legend>Requirements</legend>";
+                  
                   echo "<b>Minimum Level:</b> " . $row["MinLevel"] . "</br>";
+                  
                   echo "<b>Quest Level:</b> " . $row["QuestLevel"] . "</br>";
-                  if ($row["SkillOrClass"] > 0) {
+                  
+                  if ($row["RequiredSkill"] > 0) {
                       $skill = mysql_result(mysql_query("SELECT name FROM $trackerdb.skillline WHERE id=" . $row["SkillOrClass"]), 0);
                       echo "<b>Required Skill:</b> " . $skill . " " . $row["RequiredSkillValue"] . "</br>";
                   }
-                  if ($row["SkillOrClass"] < 0) {
-                      $skill = mysql_result(mysql_query("SELECT name FROM $trackerdb.chrclasses WHERE id=-1*" . $row["SkillOrClass"]), 0);
-                      echo "<b>Required Class:</b> " . $skill . "</br>";
+                  
+                  if ($row["RequiredClasses"] > 0) {
+                      $class = mysql_result(mysql_query("SELECT name FROM $trackerdb.chrclasses WHERE id=" . $row["SkillOrClass"]), 0);
+                      echo "<b>Required Class:</b> " . $class . "</br>";
                   }
+                  
                   echo "<b>Required Races:</b> ";
                   if ($row["RequiredRaces"] == 0)
-                      $row["RequiredRaces"] = 254;
-                  for ($i = 0; $i <= 8; $i++) {
-                      if ($i != 8) {
-                          if ($row["RequiredRaces"] & 1 << $i)
-                              echo strtolower("<img src=\"images/race_" . str_replace(" ", "", mysql_result(mysql_query("SELECT name FROM $trackerdb.chrraces WHERE id=" . ($i + 1)), 0)) . "_male.jpg\" style=width:32px> ");
+                      $row["RequiredRaces"] = $ALL_RACES;
+                  $race_max = mysql_result(mysql_query("SELECT max(id) FROM $trackerdb.chrraces"),0);
+                  for ($i = 1; $i <= $race_max; $i++) {
+                      if ($i != 9) {
+                          $imgfile = str_replace(" ", "", mysql_result(mysql_query("SELECT name FROM $trackerdb.chrraces WHERE id=$i"), 0));
+                          if ($row["RequiredRaces"] & 1 << ($i-1))
+                              $opacity = 1;
                           else
-                              echo strtolower("<img src=\"images/race_" . str_replace(" ", "", mysql_result(mysql_query("SELECT name FROM $trackerdb.chrraces WHERE id=" . ($i + 1)), 0)) . "_male.jpg\" style=width:32px;opacity:0.3> ");
+                              $opacity = 0.3;
+                          echo strtolower("<img src=\"images/race_" . $imgfile . "_male.jpg\" style=width:32px;opacity:$opacity> ");
                       }
                   }
                   echo "</br>";
-                  if ($row["RequiredMinRepFaction"] or $row["RequiredMinRepFaction"]) {
+                  
+                  if ($row["RequiredMinRepFaction"] or $row["RequiredMaxRepFaction"]) {
                       echo "<b>Required Faction Popularity:</b> ";
                       if ($row["RequiredMinRepFaction"])
                           echo mysql_result(mysql_query("SELECT name FROM $trackerdb.faction WHERE id=" . $row["RequiredMinRepFaction"]), 0) . " > " . $row["RequiredMinRepValue"] . "; ";
@@ -916,7 +835,8 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                               . "</td></tr>";
                   if ($row["RepObjectiveFaction"] > 0 && $row["RepObjectiveValue"] > 0)
                       $temp.="<tr><td><b>Gain Reputation:</b> " . mysql_result(mysql_query("SELECT name FROM $trackerdb.faction WHERE id=" . $row["RepObjectiveFaction"]), 0) . " => " . $row["RepObjectiveValue"] . "</td></tr>";
-                  if ($row["PlayersSlain"] > 0)
+
+                  if (isset($row["PlayersSlain"]) && $row["PlayersSlain"] > 0)//Exists in WoTLK
                       $temp.="<tr><td>Slay <b>" . $row["PlayersSlain"] . "</b> Enemy Players</td></tr>";
 
                   if (!empty($temp)) {
@@ -938,8 +858,11 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       if (!empty($row["RewRepFaction" . $i]) && (!empty($row["RewRepValue" . $i]) || !empty($row["RewRepValueId" . $i]) )) {
                           $temp.="<tr><td>" . mysql_result(mysql_query("SELECT name FROM $trackerdb.faction WHERE id=" . $row["RewRepFaction" . $i]), 0) . ": ";
                           $temp .= ( $row["RewRepValue" . $i] ? $row["RewRepValue" . $i] : "");
-                          $temp .= ( ($row["RewRepValue" . $i] && $row["RewRepValueId" . $i]) ? " / " : "");
-                          $temp .= ( $row["RewRepValueId" . $i] ? "<b>ID:</b> " . $row["RewRepValueId" . $i] : "") . "</td></tr>";
+                          if(isset($row["RewRepValueId" . $i])) //WoTLK
+                          {
+                              $temp .= ( ($row["RewRepValue" . $i] && $row["RewRepValueId" . $i]) ? " / " : "");
+                              $temp .= ( $row["RewRepValueId" . $i] ? "<b>ID:</b> " . $row["RewRepValueId" . $i] : "") . "</td></tr>";
+                          }
                       }
                       unset($row["RewRepFaction" . $i], $row["RewRepValue" . $i], $row["RewRepValueId" . $i]);
                   }
@@ -981,9 +904,9 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   if ($row["RewMoneyMaxLevel"] > 0)
                       $temp.="<tr><td><b>Money at max Level/XP: Raw:</b> " . $row["RewMoneyMaxLevel"] . "</td></tr>";
-                  if ($row["RewXPId"] > 0)
+                  if (isset ($row["RewXPId"]) && $row["RewXPId"] > 0)// WoTLK
                       $temp.="<tr><td><b>RewXPId: Raw:</b> " . $row["RewXPId"] . "</td></tr>";
-                  if ($row["BonusTalents"] > 0)
+                  if (isset($row["BonusTalents"]) && $row["BonusTalents"] > 0)// WoTLK
                       $temp.="<tr><td><b>Talent points:</b> " . $row["BonusTalents"] . "</td></tr>";
                   if ($row["RewOrReqMoney"] > 0)
                       $temp.="<tr><td><b>Money:</b> " . ($row["RewOrReqMoney"] >= 10000 ? floor($row["RewOrReqMoney"] / 10000) . "g" : "")
@@ -992,7 +915,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                               . "</td></tr>";
                   if ($row["RewSpellCast"] > 0 or $row["RewSpell"] > 0)
                       $temp.="<tr><td><b>Spell:</b> " . ($row["RewSpell"] > 0 ? mysql_result(mysql_query("SELECT name FROM $trackerdb.spell WHERE id=" . $row["RewSpell"]), 0) : "") . ($row["RewSpellCast"] > 0 && $row["RewSpell"] > 0 ? " -> " : "") . ($row["RewSpellCast"] > 0 ? "Cast: " . mysql_result(mysql_query("SELECT name FROM $trackerdb.spell WHERE id=" . $row["RewSpellCast"]), 0) : "") . "</td></tr>";
-                  if ($row["CharTitleId"] > 0)
+                  if (isset($row["CharTitleId"]) && $row["CharTitleId"] > 0) //TBC
                       $temp.="<tr><td><b>Title:</b> " . mysql_result(mysql_query("SELECT name FROM $trackerdb.chartitles WHERE id=" . $row["CharTitleId"]), 0) . "</td></tr>";
                   if ($row["RewMailTemplateId"] > 0)
                       $temp.="<tr><td><b>Item by Mail:</b> " . mysql_result(mysql_query("SELECT name FROM $mangosdb.item_template WHERE entry=(SELECT item FROM $mangosdb.quest_mail_loot_template WHERE entry=" . $quest . ")"), 0) . " after " . floor($row["RewMailDelaySecs"] / 60) . ":" . ($row["RewMailDelaySecs"] % 60 < 10 ? "0" : "") . ($row["RewMailDelaySecs"] % 60) . "</td></tr>";
@@ -1058,7 +981,55 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   echo "</tr></table>";
 
 
-                  unset($row["entry"], $row["PointX"], $row["PointY"], $row["PointMapId"], $row["PlayersSlain"], $row["BonusTalents"], $row["SrcItemId"], $row["RewMailTemplateId"], $row["RewMailDelaySecs"], $row["RepObjectiveFaction"], $row["RepObjectiveValue"], $row["CharTitleId"], $row["SrcItemCount"], $row["SrcSpell"], $row["RequestItemsText"], $row["RewSpellCast"], $row["RewSpell"], $row["RewOrReqMoney"], $row["RewMoneyMaxLevel"], $row["OfferRewardText"], $row["QuestFlags"], $row["SpecialFlags"], $row["LimitTime"], $row["SuggestedPlayers"], $row["Details"], $row["Objectives"], $row["Title"], $row["MinLevel"], $row["QuestLevel"], $row["ZoneOrSort"], $row["Type"], $row["SkillOrClass"], $row["RequiredSkillValue"], $row["RequiredRaces"], $row["RequiredMinRepFaction"], $row["RequiredMaxRepFaction"], $row["RequiredMinRepValue"], $row["RequiredMaxRepValue"], $row["PrevQuestId"], $row["NextQuestId"], $row["NextQuestInChain"], $row["ExclusiveGroup"], $row["RewXPId"], $row["CompletedText"], $row["EndText"], $row["IncompleteEmote"], $row["CompleteEmote"]);
+                  unset($row["entry"],
+                        $row["PointX"],
+                        $row["PointY"],
+                        $row["PointMapId"],
+                        $row["BonusTalents"],
+                        $row["PlayersSlain"],
+                        $row["SrcItemId"],
+                        $row["RewMailTemplateId"],
+                        $row["RewMailDelaySecs"],
+                        $row["RepObjectiveFaction"],
+                        $row["RepObjectiveValue"],
+                        $row["CharTitleId"],
+                        $row["SrcItemCount"],
+                        $row["SrcSpell"],
+                        $row["RequestItemsText"],
+                        $row["RewSpellCast"],
+                        $row["RewSpell"],
+                        $row["RewOrReqMoney"],
+                        $row["RewMoneyMaxLevel"],
+                        $row["OfferRewardText"],
+                        $row["QuestFlags"],
+                        $row["SpecialFlags"],
+                        $row["LimitTime"],
+                        $row["SuggestedPlayers"],
+                        $row["Details"],
+                        $row["Objectives"],
+                        $row["Title"],
+                        $row["MinLevel"],
+                        $row["QuestLevel"],
+                        $row["ZoneOrSort"],
+                        $row["Type"],
+                        $row["RequiredClasses"],
+                        $row["RequiredSkill"],
+                        $row["RequiredSkillValue"],
+                        $row["RequiredRaces"],
+                        $row["RequiredMinRepFaction"],
+                        $row["RequiredMaxRepFaction"],
+                        $row["RequiredMinRepValue"],
+                        $row["RequiredMaxRepValue"],
+                        $row["PrevQuestId"],
+                        $row["NextQuestId"],
+                        $row["NextQuestInChain"],
+                        $row["ExclusiveGroup"],
+                        $row["RewXPId"],
+                        $row["CompletedText"],
+                        $row["EndText"],
+                        $row["IncompleteEmote"],
+                        $row["CompleteEmote"]
+                        );
 
                   $temp = "";
                   $n = 0;
