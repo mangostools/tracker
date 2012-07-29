@@ -743,7 +743,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   //On Quest Start
                   $temp = "";
                   if ($row["SrcItemId"] > 0 && $row["SrcItemCount"] > 0)
-                      $temp.="<tr><td><b>Provided Item:</b> " . $row["SrcItemCount"] . "x " . mysql_result(mysql_query("SELECT name FROM $mangosdb.item_template WHERE entry=" . $row["SrcItemId"]), 0) . "</td></tr>";
+                      $temp.="<tr><td><b>Provided Item:</b> " . $row["SrcItemCount"] . "x <a href=\"http://old.wowhead.com/item=" .$row["SrcItemId"] . "\" target=_blank>" . id2name("item_template", $row["SrcItemId"]). "</td></tr>";
                   if ($row["SrcSpell"] > 0)
                       $temp.="<tr><td><b>Spell:</b> " . mysql_result(mysql_query("SELECT name FROM $trackerdb.spell WHERE id=" . $row["SrcSpell"]), 0) . "</td></tr>";
                   if (!empty($temp)) {
@@ -774,7 +774,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   for ($i = 1; $i <= 6; $i++) {
                       if (!empty($row["ReqItemId" . $i]) && !empty($row["ReqItemCount" . $i])) {
-                          $temp.="<tr><td>" . $row["ReqItemCount" . $i] . "x <a href=\"http://old.wowhead.com/item=" . mysql_result(mysql_query("SELECT entry FROM $mangosdb.item_template WHERE entry=" . $row["ReqItemId" . $i]), 0) . "\" target=_blank>" . mysql_result(mysql_query("SELECT name FROM $mangosdb.item_template WHERE entry=" . $row["ReqItemId" . $i]), 0) . "</a></td></tr>";
+                          $temp.="<tr><td>" . $row["ReqItemCount" . $i] . "x <a href=\"http://old.wowhead.com/item=" . $row["ReqItemId". $i] . "\" target=_blank>" . id2name("item_template", $row["ReqItemId" . $i]) . "</a></td></tr>";
                       }
                       unset($row["ReqItemCount" . $i], $row["ReqItemId" . $i]);
                   }
@@ -801,7 +801,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   for ($i = 1; $i <= 4; $i++) {
                       if (!empty($row["ReqSourceId" . $i])) {
-                          $temp .= "<tr><td>" . ($row["ReqSourceCount" . $i] > 0 ? $row["ReqSourceCount" . $i] . "x " : "unlimited ") . mysql_result(mysql_query("SELECT name FROM $mangosdb.item_template WHERE entry=" . $row["ReqSourceId" . $i]), 0) . "</td></tr>";
+                          $temp .= "<tr><td>" . ($row["ReqSourceCount" . $i] > 0 ? $row["ReqSourceCount" . $i] . "x " : "unlimited ") . "<a href=\"http://old.wowhead.com/item=" . $row["ReqSourceId". $i] . "\" target=_blank>" . id2name("item_template",$row["ReqSourceId" . $i]) . "</a></td></tr>";
                       }
                       unset($row["ReqSourceId" . $i], $row["ReqSourceCount" . $i]);
                   }
@@ -876,7 +876,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   for ($i = 1; $i <= 6; $i++) {
                       if (!empty($row["RewChoiceItemId" . $i]) && !empty($row["RewChoiceItemCount" . $i])) {
-                          $temp.="<tr><td>" . $row["RewChoiceItemCount" . $i] . "x " . id2name("item_template", $row["RewChoiceItemId" . $i]) . "</td></tr>";
+                          $temp.="<tr><td>" . $row["RewChoiceItemCount" . $i] . "x <a href=\"http://old.wowhead.com/item=". $row["RewChoiceItemId" . $i] . "\" target=_blank>" . id2name("item_template", $row["RewChoiceItemId" . $i]) . "</td></tr>";
                       }
                       unset($row["RewChoiceItemCount" . $i], $row["RewChoiceItemId" . $i]);
                   }
@@ -890,7 +890,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   for ($i = 1; $i <= 4; $i++) {
                       if (!empty($row["RewItemId" . $i]) && !empty($row["RewItemCount" . $i])) {
-                          $temp.="<tr><td>" . $row["RewItemCount" . $i] . "x " . id2name("item_template", $row["RewItemId" . $i]) . "</td></tr>";
+                          $temp.="<tr><td>" . $row["RewItemCount" . $i] . "x <a href=\"http://old.wowhead.com/item=". $row["RewItemId" . $i] . "\" target=_blank>" . id2name("item_template", $row["RewItemId" . $i]) . "</td></tr>";
                       }
                       unset($row["RewItemCount" . $i], $row["RewItemId" . $i]);
                   }
