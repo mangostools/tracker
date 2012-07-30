@@ -23,7 +23,7 @@ function id2name($table, $id) {
 $zos_profession = "-24,-101,-121,-181,-182,-201,-264,-304,-324";
 $zos_class = "-61,-81,-82,-141,-161,-162,-261,-262,-263";
 
-$ALL_RACES = 255; //255 for vanilla, 1691 for >= TBC
+$ALL_RACES = 1791; //255 for vanilla, 1791 for >= TBC
 
 $quest_flags = Array(
     "QUEST_FLAGS_NONE", //0
@@ -74,7 +74,8 @@ $status = Array(
     "DB issue", //4
     "Completable", //5
     "Blizz-like", //6
-    "Obsolete" //7
+    "Obsolete", //7
+    "PLZ Test!!" //8
 );
 
 $filter_status = !empty($_GET["filterstatus"]) ? $_GET["filterstatus"] : "any";
@@ -87,7 +88,8 @@ $statuscolor = Array(
     "darkcyan",
     "green",
     "blue",
-    "gray");
+    "gray",
+    "#f0f");
 
 mysql_connect($server, $user, $password, $mangosdb);
 mysql_select_db($mangosdb);
@@ -156,10 +158,18 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
     $sql = mysql_query("SELECT COUNT(id) FROM $trackerdb.users WHERE id=" . $_SESSION["id"] . " AND MD5(CONCAT( `password` , `lastlogin` )) = \"" . $_SESSION["hash"] . "\"") or die(mysql_error());
     if (mysql_result($sql, 0) == 1)
     {
-        $login = "Logged in as " . id2nick($_SESSION["id"]) . " (<a href=index.php?dologout>Log Out</a>)";
+        $login = "Logged in as <a href=?settings>" . id2nick($_SESSION["id"]) . "</a> (<a href=index.php?dologout>Log Out</a>)";
         $power = mysql_result(mysql_query("SELECT power FROM $trackerdb.users WHERE id = ".$_SESSION["id"] ),0);
         if($power == 100)
           $login = "<a href=?admin_start>Administration</a> | ".$login;
+        if(!empty($characterdb))
+        {
+            $char_id = mysql_result(mysql_query("SELECT linked_char_id FROM $trackerdb.users WHERE id =".$_SESSION["id"]),0);
+            if($char_id != 0)
+                $character_name = mysql_result(mysql_query("SELECT name FROM $characterdb.characters WHERE guid = ".$char_id),0);
+            else
+                $notice = "If you are actively playing on this server, you can see your character quest progress by linking it to your account! <a href=?settings>Click here to link your character</a>";
+        }
     }
     else
         unset($_SESSION);
@@ -175,20 +185,44 @@ if (isset($_GET["deletepost"]) && is_numeric($_GET["deletepost"])) {
 if (isset($_GET["doreport"]) && is_numeric($quest) && isset($_POST["rev"]) && $_POST["rev"] != -1 && !empty($_POST["report"]) && isset($_SESSION["id"])) {
     mysql_query("INSERT INTO $trackerdb.status (quest_id, user, dbver, status, report, ts) VALUES ($quest, " . $_SESSION["id"] . ", \"" . mysql_real_escape_string($_POST["rev"]) . "\", \"" . mysql_real_escape_string($_POST["status"]) . "\", \"" . mysql_real_escape_string($_POST["report"]) . "\", " . time() . " )") or die(mysql_error());
 }
-
-if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
-    $power = mysql_result(mysql_query("SELECT power FROM $trackerdb.users WHERE id = ".$_SESSION["id"] ),0);
-    if($power == 100)
-      include("admin.php");
-    die();
+if(isset($_GET["obsoletepost"]) && is_numeric($_GET["obsoletepost"]))
+{
+    mysql_query("UPDATE $trackerdb.status SET status=-status, report=CONCAT(report,\"<p><i>Marked obsolete by ".id2nick($_SESSION["id"])." (".date("d.m.Y H:i:s",time()).")</i></p>\") WHERE id =".$_GET["obsoletepost"]." AND status>0");
+}
+if(isset($_GET["unobsoletepost"]) && is_numeric($_GET["unobsoletepost"]))
+{
+    mysql_query("UPDATE $trackerdb.status SET status=-status, report=CONCAT(report,\"<p><i>Marked valid by ".id2nick($_SESSION["id"])." (".date("d.m.Y H:i:s",time()).")</i></p>\") WHERE id =".$_GET["unobsoletepost"]." AND status<0");
 }
 
+//change password
+if(isset($_GET["change_pwd"]) && isset($_POST["password"]) && isset($_POST["password2"]) && strlen($_POST["password"]) > 3 && $_POST["password"] == $_POST["password2"])
+{
+    $salt = time();
+    mysql_query("UPDATE $trackerdb.users SET password = \"".md5($_POST["password"])."\", lastlogin=" . $salt . " WHERE id = ".$_SESSION["id"]) or die(mysql_error());
+    $_SESSION["hash"] = md5(md5($_POST["password"]) . $salt);
+    echo "Password changed";
+}
+
+//link character
+if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb))
+{
+    $sql = mysql_query("SELECT guid FROM $characterdb.characters WHERE name = \"".mysql_real_escape_string($_POST["charname"])."\"");
+    if(mysql_num_rows($sql)>0)
+    {
+        $char_id = mysql_result($sql,0);
+        mysql_query("UPDATE $trackerdb.users SET linked_char_id = $char_id WHERE id =".$_SESSION["id"]);
+        echo "Character \"".$_POST["charname"]."\" successfully linked!!";
+
+    }
+    else
+        echo "Character \"".$_POST["charname"]."\" not found!!";
+}
 
 
 ?>
 <html>
     <head>
-        <title>&quot;mangos-zero&quot; Quest Tracker - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
+        <title><?php echo $title;?> - <?php echo mysql_result(mysql_query("SELECT version FROM $mangosdb.db_version"), 0); ?></title>
         <script type="text/javascript" src="http://static.wowhead.com/widgets/power.js"></script>
         <style>
             body, td, div { font-family:Helvetica,Arial,sans-serif; font-size:12px;}
@@ -225,6 +259,12 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
             .tag_horde    {background-color:#3f2d1d; color:#c92300; border-color: #929292; border-width:2px; border-style:solid}
             .tag_gray     {background-color:#ddd;    color:#eee;    border-color: #eee;    border-width:2px; border-style:solid}
 
+            .tag_char_available     {background-color:green;    color:white;}
+            .tag_char_unavailable   {background-color:red;    color:white;}
+            .tag_char_incomplete    {background-color:orange;    color:white;}
+            .tag_char_completed     {background-color:darkcyan;    color:white;}
+            .tag_char_rewarded      {background-color:blue;    color:white;}
+
             .tag0 {background-color:black;      color:white;}
             .tag1 {background-color:red;        color:white;}
             .tag2 {background-color:brown;      color:white;}
@@ -233,6 +273,9 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
             .tag5 {background-color:green;      color:white;}
             .tag6 {background-color:blue;       color:white;}
             .tag7 {background-color:#777;       color:white;}
+            .tag8 {background-color:#f0f;       color:white;}
+
+            .tag_obsolete{border:2px solid #333;text-decoration: line-through;}
 
 
         </style>
@@ -253,6 +296,58 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
               $select_rev.="</select><input type=submit value=\"Change\"></form>  ";
               $login = $search_form . " | " . $select_status . " | " . $select_rev . " | <a href=index.php?recent&showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">Recent entries</a> | <a href=index.php?problems&showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">Obvious Problems</a> | " . $login;
               echo "<tr><td class=breadcrumbs colspan=2><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . ">root</a>&nbsp;>>&nbsp;";
+
+              /**
+              *
+              * Administration
+              *
+              */
+              if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
+                  $power = mysql_result(mysql_query("SELECT power FROM $trackerdb.users WHERE id = ".$_SESSION["id"] ),0);
+                  if($power == 100)
+                  {
+                      echo "Tracker Administration</td><td class=login>$login</td></tr>";
+                      echo "<tr><td colspan=3>";
+
+                      include("admin.php");
+                      echo "</td></tr>";
+                  }
+                  die();
+              }
+              /**
+              *
+              * User Settings
+              *
+              */
+              if (isset($_GET["settings"]) && isset($_SESSION["id"])) {
+                  echo "User Settings</td><td class=login>$login</td></tr>";
+                  echo "<tr><td colspan=3>";
+                  echo "<fieldset><legend>Change Password</legend>
+                            <form action=index.php?settings&change_pwd method=post>
+                                <tt>Password:      </tt> <input name=password type=password style=\"width:250px\"></br>
+                                <tt>Password again:</tt> <input name=password2 type=password style=\"width:250px\"></br>
+                                <input type=submit>
+                            </form>
+                        </fieldset>";
+                  if(!empty($characterdb)) {
+                      $linked_char_id = mysql_result(mysql_query("SELECT linked_char_id FROM $trackerdb.users WHERE id =".$_SESSION["id"]),0);
+                      if($linked_char_id == 0)
+                          $character_name = "No character linked";
+                      else
+                          $character_name = mysql_result(mysql_query("SELECT name FROM $characterdb.characters WHERE guid = ".$linked_char_id),0);
+                      echo "<fieldset><legend>Link Character</legend>
+                            You can link a Character from the game server to this account to see the quest progress in the tracker.<br>
+                            Linked Character: <b>".$character_name."</b>
+                            <form action=index.php?settings&link_char method=post>
+                                <tt>Character Name:      </tt> <input name=charname style=\"width:250px\"></br>
+                                <input type=submit>
+                            </form>
+                        </fieldset>";
+                  }
+
+                  echo "</td></tr>";
+                  die();
+              }
 
               /**
               *
@@ -384,13 +479,15 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
               */
               elseif ($map == "x" && $areasort == "x" && $quest == "x") {
                   echo "Map Selection</td><td class=login colspan=2>$login</td></tr>";
+                  if(isset($notice))
+                    echo "<tr><td colspan=3 style=color:red;font-weight:bold>Notice: $notice</td></tr>";
 
                   //Build the map list
                   $list = Array();
                   //First a total count
                   $all = mysql_fetch_assoc(mysql_query("SELECT COUNT(entry) AS num,group_concat(DISTINCT ZoneOrSort SEPARATOR \",\") AS zones FROM $mangosdb.quest_template"));
                   $list[] = Array("num"=>$all["num"], "zones"=>$all["zones"], "map"=>"x", "name"=>"All Quests", "type"=>-1);
-                  
+
                   //Regular Maps, Instances, Raids, BGs
                   $sql = mysql_query("SELECT count( mq.entry ) AS num, group_concat(DISTINCT mq.ZoneOrSort SEPARATOR \",\") AS zones, ta.map, tm.name, tm.type FROM $mangosdb.quest_template AS mq, $trackerdb.areatable AS ta, $trackerdb.map AS tm WHERE mq.ZoneOrSort >0 AND mq.ZoneOrSort = ta.id AND ta.map = tm.id GROUP BY tm.id ASC ORDER BY tm.type, ta.map ASC");
                   while ($row = mysql_fetch_assoc($sql))
@@ -408,7 +505,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $list[] = Array("num"=>$other_count, "zones"=>0, "map"=>"u", "name"=>"Other/Unknown", "type"=>999);
 
                   $prev_type = "";
-                  
+
                   for ($i =0; $i < count($list); $i++)
                   {
                       $line = $list[$i];
@@ -416,7 +513,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       {
                           $prev_type = $line["type"];
                           echo "<tr><td colspan=4 style=background-color:#eee>".$map_types[$line["type"]]."</td></tr>";
-                          echo "<tr><td>Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
+                          echo "<tr><td>Name</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>/<font color=#f0f>PLZ Test!!</font>)</td><td>working</td></tr>";
                       }
                       $unknown = $line["num"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id IN (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort IN (".$line["zones"].")) AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
                       $track_status = "";
@@ -429,12 +526,12 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       if(is_numeric($filter_status) && empty($track_status))
                           continue;
                       $track_status = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $track_status;
-                      $percent_completable = round((($working[5] + $working[6]) / $line["num"]) * 100, 2);
+                      $percent_completable = round((($working[5] + $working[6] + $working[7]) / $line["num"]) * 100, 2);
                       $percent_not_completable = round(($working[1] / $line["num"]) * 100, 2);
                       $percent_unknown = 100 - $percent_not_completable - $percent_completable;
                       $group_status = "<span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span>";
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $line["map"] . ">" . $line["name"] . "</a></td><td>" . $line["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
-                      
+
                   }
               }
                 /**
@@ -475,7 +572,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       die("You should not have been able to come here...");
                   }
                   echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a> >> $selector Selection</td><td class=login colspan=2>$login</td></tr>";
-                  echo "<tr><td>$selector</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>)</td><td>working</td></tr>";
+                  echo "<tr><td>$selector</td><td>Quests total</td><td>Trac Progress (<font color=black>unk</font>/<font color=red>bug</font>/<font color=brown>core</font>/<font color=orange>script</font>/<font color=darkcyan>DB</font>/<font color=green>ok</font>/<font color=blue>blizzlike</font>/<font color=#f0f>PLZ Test!!</font>)</td><td>working</td></tr>";
 
                   while ($row = mysql_fetch_assoc($sql)) {//
                       $unknown = $row["num"] - mysql_result(mysql_query("SELECT COUNT(DISTINCT quest_id) FROM $trackerdb.status WHERE quest_id IN (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort = ".$row["ZoneOrSort"].") AND status > 0 AND (dbver=" . (is_numeric($show_data_for_rev) ? $show_data_for_rev : "0 or dbver>0") . ")"), 0);
@@ -489,10 +586,14 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       if(is_numeric($filter_status) && empty($track_status))
                           continue;
                       $track_status = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $track_status;
-                      $percent_completable = round((($working[5] + $working[6]) / $row["num"]) * 100, 2);
+                      $percent_completable = round((($working[5] + $working[6] + $working[7]) / $row["num"]) * 100, 2);
                       $percent_not_completable = round(($working[1] / $row["num"]) * 100, 2);
                       $percent_unknown = 100 - $percent_not_completable - $percent_completable;
                       $group_status = "<span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span>";
+                      if(isset($character_name) && isset($char_id)){
+                          $char_num_rewarded= mysql_result(mysql_query("SELECT count(quest) AS num FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest IN (SELECT entry FROM $mangosdb.quest_template WHERE ZoneOrSort = ".$row["ZoneOrSort"].") AND rewarded = 1"),0);
+                          $group_status .=" <span class=\"tag tag_char_rewarded\">$character_name $char_num_rewarded/".$row["num"]." rewarded</span>";
+                      }
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $map . "&areasort=".$row["ZoneOrSort"].">" . $row["name"] . "</a></td><td>" . $row["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
                   }//
               }
@@ -507,7 +608,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       $areaname = $res["areaname"];
                       $map = $res["id"];
                       $mapname = $res["mapname"];
-                      
+
                   }
                   if ($areasort < 0) {
                       if(in_array($areasort, explode(",", $zos_profession)))
@@ -529,7 +630,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   }
                   echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a>&nbsp;>>&nbsp;<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$areaname</a>&nbsp;>>&nbsp;</td><td class=login>$login</td></tr>";
 
-                  
+
                   $sql = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
 
                   while ($row = mysql_fetch_assoc($sql)) {
@@ -537,9 +638,24 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
                       $queststatus = "";
                       while ($row2 = mysql_fetch_array($res2))
-                          $queststatus.="<span class=\"tag tag" . $row2["status"] . "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
+                          $queststatus.="<span class=\"tag tag" . abs($row2["status"]) . " " . ($row2["status"] < 0 ? "tag_obsolete":""). "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
                       if(is_numeric($filter_status) && empty($queststatus))
                           continue;
+
+                      if(isset($character_name) && isset($char_id)){
+                          $char_quest_data= mysql_fetch_array(mysql_query("SELECT status, rewarded FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest = ".$row["entry"]));
+                          switch ($char_quest_data["status"])
+                          {
+                              case 1: $queststatus .="<span class=\"tag tag_char_completed\" >$character_name completed</span> ";break;
+                              case 2: $queststatus .="<span class=\"tag tag_char_unavailable\" >$character_name unavailable</span> ";break;
+                              case 3: $queststatus .="<span class=\"tag tag_char_incomplete\" >$character_name incomplete</span> ";break;
+                              case 4: $queststatus .="<span class=\"tag tag_char_available\" >$character_name available</span> ";break;
+                          }
+                          if($char_quest_data["rewarded"] == 1)
+                              $queststatus .="<span class=\"tag tag_char_rewarded\" >$character_name rewarded</span> ";
+                      }
+
+
                       $side_a = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 1101) ? "tag_alliance" : "tag_gray";
                       $side_h = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 690) ? "tag_horde" : "tag_gray";
 
@@ -554,7 +670,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                 */
               elseif (is_numeric($quest)) {
                   $row = mysql_fetch_assoc(mysql_query("SELECT * FROM $mangosdb.quest_template WHERE entry = $quest"));
-                  
+
                   //We must backcalculate the breadcrumbs
                   $areasort = $row["ZoneOrSort"];
                   switch ($areasort) {
@@ -580,21 +696,21 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   }
                   echo "Quest " . $quest . " - " . $row["Title"] . "</td><td class=login>$login</td></tr>";
                   //end breadcrumbs
-                  
+
                   echo "<tr><td colspan=3>";
-                  
+
                   echo "<fieldset><legend>General Information</legend>";
-                  
+
                   echo "<b>Quest ID:</b> " . $row["entry"] . "</br>";
-                  
+
                   echo "<b>Title:</b> <a href=\"http://old.wowhead.com/quest=" . $row["entry"] . "\" target=_blank>" . htmlentities($row["Title"]) . "</a></br>";
-                  
+
                   $questtype = $row["Type"] == 0 ? "none" : mysql_result(mysql_query("SELECT name FROM $trackerdb.questinfo WHERE id=" . $row["Type"]), 0);
                   echo "<b>Quest Type:</b> " . $questtype . "</br>";
-                  
+
                   if ($row["SuggestedPlayers"] > 0)
                       echo "Suggested Players: " . $row["SuggestedPlayers"] . "</br>";
-                  
+
                   echo "<b>Quest Start:</b> ";
                   if (mysql_result(mysql_query("SELECT COUNT(id) FROM $mangosdb.creature_questrelation WHERE quest=" . $quest), 0) > 0) {
                       $creature_id = mysql_result(mysql_query("SELECT id FROM $mangosdb.creature_questrelation WHERE quest=" . $quest), 0);
@@ -610,7 +726,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   else
                       echo "---";
                   echo "</br>";
-                  
+
                   echo "<b>Quest End:</b> ";
                   if (mysql_result(mysql_query("SELECT COUNT(id) FROM $mangosdb.creature_involvedrelation WHERE quest=" . $quest), 0) > 0) {
                       $creature_id = mysql_result(mysql_query("SELECT id FROM $mangosdb.creature_involvedrelation WHERE quest=" . $quest), 0);
@@ -620,33 +736,33 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   else
                       echo "---";
                   echo "</br>";
-                  
+
                   if ($row["PointX"] != 0 && $row["PointY"] != 0)
                       echo "<b>Point of Interest:</b> " . mysql_result(mysql_query("SELECT name FROM $trackerdb.map WHERE id=" . $row["PointMapId"]), 0) . " (X:" . $row["PointX"] . " - Y:" . $row["PointY"] . ")</br>";
                   echo "</fieldset>";
 
                   echo "<fieldset><legend>Requirements</legend>";
-                  
+
                   echo "<b>Minimum Level:</b> " . $row["MinLevel"] . "</br>";
-                  
+
                   echo "<b>Quest Level:</b> " . $row["QuestLevel"] . "</br>";
-                  
+
                   if ($row["RequiredSkill"] > 0) {
-                      $skill = mysql_result(mysql_query("SELECT name FROM $trackerdb.skillline WHERE id=" . $row["SkillOrClass"]), 0);
+                      $skill = mysql_result(mysql_query("SELECT name FROM $trackerdb.skillline WHERE id=" . $row["RequiredSkill"]), 0);
                       echo "<b>Required Skill:</b> " . $skill . " " . $row["RequiredSkillValue"] . "</br>";
                   }
-                  
+
                   if ($row["RequiredClasses"] > 0) {
-                      $class = mysql_result(mysql_query("SELECT name FROM $trackerdb.chrclasses WHERE id=" . $row["SkillOrClass"]), 0);
+                      $class = mysql_result(mysql_query("SELECT name FROM $trackerdb.chrclasses WHERE id=" . $row["RequiredClasses"]), 0);
                       echo "<b>Required Class:</b> " . $class . "</br>";
                   }
-                  
+
                   echo "<b>Required Races:</b> ";
                   if ($row["RequiredRaces"] == 0)
                       $row["RequiredRaces"] = $ALL_RACES;
                   $race_max = mysql_result(mysql_query("SELECT max(id) FROM $trackerdb.chrraces"),0);
                   for ($i = 1; $i <= $race_max; $i++) {
-                      if ($i != 9) {
+                      if ($i != 9 && $i <=11) {
                           $imgfile = str_replace(" ", "", mysql_result(mysql_query("SELECT name FROM $trackerdb.chrraces WHERE id=$i"), 0));
                           if ($row["RequiredRaces"] & 1 << ($i-1))
                               $opacity = 1;
@@ -656,7 +772,7 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                       }
                   }
                   echo "</br>";
-                  
+
                   if ($row["RequiredMinRepFaction"] or $row["RequiredMaxRepFaction"]) {
                       echo "<b>Required Faction Popularity:</b> ";
                       if ($row["RequiredMinRepFaction"])
@@ -1048,9 +1164,13 @@ if (isset($_GET["admin_start"]) && isset($_SESSION["id"])) {
                   $temp = "";
                   $sql = mysql_query("SELECT id, user, dbver, report, status, ts FROM $trackerdb.status WHERE quest_id=" . $quest . " AND dbver >= " . $c_database_version);
                   while ($row = mysql_fetch_assoc($sql)) {
-                      $temp.="<tr><td>" . $database_version[$row["dbver"]] . "</td><td><span style=color:" . $statuscolor[$row["status"]] . ">" . $status[$row["status"]] . "</span></td><td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . " by " . id2nick($row["user"]) . "</i>";
+                      $temp.="<tr><td>" . $database_version[$row["dbver"]] . "</td><td><span style=color:" . $statuscolor[abs($row["status"])] . ";".($row["status"]<0?"text-decoration:line-through;":"") .">" . $status[abs($row["status"])] . "</span></td><td>" . nl2br($row["report"]) . "</br><i>" . date("d.m.Y H:i:s", $row["ts"]) . " by " . id2nick($row["user"]) . "</i>";
                       if (isset($_SESSION["id"]) && $row["user"] == $_SESSION["id"])
                           $temp .=" - <a href=index.php?showrev=$show_data_for_rev&filterstatus=$filter_status&quest=$quest&deletepost=" . $row["id"] . ">delete</a>";
+                      if (isset($_SESSION["id"]) && $row["status"]>0)
+                          $temp .=" - <a href=index.php?showrev=$show_data_for_rev&filterstatus=$filter_status&quest=$quest&obsoletepost=".$row["id"].">mark report as obsolete</a>";
+                      if (isset($_SESSION["id"]) && $row["status"]<0)
+                          $temp .=" - <a href=index.php?showrev=$show_data_for_rev&filterstatus=$filter_status&quest=$quest&unobsoletepost=".$row["id"].">mark this report as valid</a>";
                       $temp .="</td></tr>";
                   }
                   echo "<fieldset><legend>Quest Status</legend><table cellspacing=0 style=width:100% class=main>

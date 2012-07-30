@@ -2,10 +2,13 @@
 
 $mangosdb = "zp_world";
 $trackerdb = "zp_tracker";
+$characterdb = ""; //Set this to a non-empty value to enable viewing character quest progress in the tracker
 
 $server = "localhost";
 $user = "zp";
 $password = "zpdb";
+
+$title = "Quest Tracker";
 
 error_reporting(E_ALL | E_STRICT);
 ini_set('display_errors', 0);
