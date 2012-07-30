@@ -7,6 +7,9 @@ $offset = empty($_GET['offset']) ? 0 : $_GET['offset'];
 $quest = empty($_GET['quest']) ? "x" : $_GET['quest'];
 $query = empty($_POST['query']) ? "Title or ID" : $_POST['query'];
 
+$character_name = "";
+$char_id = 0;
+
 function id2nick($id) {
     global $trackerdb;
     if ($id > 0)
@@ -19,6 +22,34 @@ function id2name($table, $id) {
     global $mangosdb;
     return mysql_result(mysql_query("SELECT name FROM $mangosdb.$table WHERE entry=" . $id), 0);
 }
+
+function get_queststatus($quest)
+{
+    global $trackerdb, $characterdb, $status, $database_version, $character_name, $char_id, $c_database_version, $filter_status;
+    $statusfilter = is_numeric($filter_status) ? " AND status = $filter_status " : "";
+    $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $quest . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
+    $queststatus = "";
+    while ($row2 = mysql_fetch_array($res2))
+        $queststatus.="<span class=\"tag tag" . abs($row2["status"]) . " " . ($row2["status"] < 0 ? "tag_obsolete":""). "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
+    if(is_numeric($filter_status) && empty($queststatus))
+        continue;
+
+    if(isset($character_name) && isset($char_id)){
+        $char_quest_data= mysql_fetch_array(mysql_query("SELECT status, rewarded FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest = ".$quest));
+        switch ($char_quest_data["status"])
+        {
+            case 1: $queststatus .="<span class=\"tag tag_char_completed\" >$character_name completed</span> ";break;
+            case 2: $queststatus .="<span class=\"tag tag_char_unavailable\" >$character_name unavailable</span> ";break;
+            case 3: $queststatus .="<span class=\"tag tag_char_incomplete\" >$character_name incomplete</span> ";break;
+            case 4: $queststatus .="<span class=\"tag tag_char_available\" >$character_name available</span> ";break;
+        }
+        if($char_quest_data["rewarded"] == 1)
+            $queststatus .="<span class=\"tag tag_char_rewarded\" >$character_name rewarded</span> ";
+    }
+
+    return $queststatus;
+}
+
 
 $zos_profession = "-24,-101,-121,-181,-182,-201,-264,-304,-324";
 $zos_class = "-61,-81,-82,-141,-161,-162,-261,-262,-263";
@@ -634,32 +665,10 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                   $sql = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
 
                   while ($row = mysql_fetch_assoc($sql)) {
-                      $statusfilter = is_numeric($filter_status) ? " AND status = $filter_status " : "";
-                      $res2 = mysql_query("SELECT status, dbver FROM $trackerdb.status WHERE quest_id = " . $row["entry"] . " AND dbver>=" . $c_database_version . " " . $statusfilter . " GROUP BY status ASC, dbver DESC");
-                      $queststatus = "";
-                      while ($row2 = mysql_fetch_array($res2))
-                          $queststatus.="<span class=\"tag tag" . abs($row2["status"]) . " " . ($row2["status"] < 0 ? "tag_obsolete":""). "\" title=\"" . $status[$row2["status"]] . "\">" . $database_version[$row2["dbver"]] . "</span> ";
-                      if(is_numeric($filter_status) && empty($queststatus))
-                          continue;
-
-                      if(isset($character_name) && isset($char_id)){
-                          $char_quest_data= mysql_fetch_array(mysql_query("SELECT status, rewarded FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest = ".$row["entry"]));
-                          switch ($char_quest_data["status"])
-                          {
-                              case 1: $queststatus .="<span class=\"tag tag_char_completed\" >$character_name completed</span> ";break;
-                              case 2: $queststatus .="<span class=\"tag tag_char_unavailable\" >$character_name unavailable</span> ";break;
-                              case 3: $queststatus .="<span class=\"tag tag_char_incomplete\" >$character_name incomplete</span> ";break;
-                              case 4: $queststatus .="<span class=\"tag tag_char_available\" >$character_name available</span> ";break;
-                          }
-                          if($char_quest_data["rewarded"] == 1)
-                              $queststatus .="<span class=\"tag tag_char_rewarded\" >$character_name rewarded</span> ";
-                      }
-
-
                       $side_a = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 1101) ? "tag_alliance" : "tag_gray";
                       $side_h = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 690) ? "tag_horde" : "tag_gray";
 
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . $queststatus . "</td></tr>";
+                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . get_queststatus($row["entry"]) . "</td></tr>";
                   }
               }
 
@@ -812,7 +821,7 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                           $parent *= - 1;
                           $parent_active = true;
                       }
-                      echo "<b>Previous quest:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $parent . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $parent), 0) . " (" . $parent . ")</a>" . ($parent_active ? " (must be active)" : "") . "<br>";
+                      echo "<b>Previous quest:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $parent . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $parent), 0) . " (" . $parent . ")</a> " . ($parent_active ? "(must be active) " : "") .get_queststatus($parent) . "<br>";
                   }
 
                   $next = $row["NextQuestId"];
@@ -822,36 +831,33 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                           $next *= - 1;
                           $subquest = true;
                       }
-                      echo "<b>Next quest:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $next . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $next), 0) . " (" . $next . ")</a>" . ($subquest ? " (subquest)" : "") . "<br>";
+                      echo "<b>Next quest:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $next . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $next), 0) . " (" . $next . ")</a> " . ($subquest ? "(subquest) " : "").get_queststatus($next) . "<br>";
                   }
                   $chain = $row["NextQuestInChain"];
                   if ($chain != 0) {
-                      echo "<b>Quest Chain:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $chain . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $chain), 0) . " (" . $chain . ")</a><br>";
+                      echo "<b>Quest Chain:</b> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $chain . ">" . mysql_result(mysql_query("SELECT Title FROM $mangosdb.quest_template WHERE entry=" . $chain), 0) . " (" . $chain . ")</a> ".get_queststatus($chain) . "<br>";
                   }
                   $others = mysql_result(mysql_query("SELECT Count(entry) FROM $mangosdb.quest_template WHERE PrevQuestId=$quest OR PrevQuestId=-$quest"), 0);
                   if ($others > 0) {
                       echo "<b>Quests pointing to this:</b> <ul>";
                       $sql = mysql_query("SELECT entry, Title FROM $mangosdb.quest_template WHERE PrevQuestId=$quest OR PrevQuestId=-$quest ORDER BY entry");
                       while ($row2 = mysql_fetch_assoc($sql)) {
-                          echo "<li><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row2["entry"] . ">" . $row2["Title"] . " (" . $row2["entry"] . ")</a></li>";
+                          echo "<li><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row2["entry"] . ">" . $row2["Title"] . " (" . $row2["entry"] . ")</a> ".get_queststatus($row2["entry"])."</li>";
                       }
                       echo "</ul>";
                   }
                   $exclusivegroup = $row["ExclusiveGroup"];
                   if (!empty($exclusivegroup)) {
-                      echo "<b>Exclusive Group:</b> ";
                       $res = mysql_query("SELECT entry,Title FROM $mangosdb.quest_template WHERE ExclusiveGroup=$exclusivegroup");
-                      $i = 0;
+                      $temp = array();
                       while ($row2 = mysql_fetch_array($res)) {
-                          if ($i > 0) {
-                              if ($exclusivegroup > 0)
-                                  echo " OR ";
-                              else
-                                  echo " AND ";
-                          }
-                          echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row2["entry"] . ">" . $row2["Title"] . " (" . $row2["entry"] . ")</a>";
-                          $i++;
+                          $temp[] = "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row2["entry"] . ">" . $row2["Title"] . " (" . $row2["entry"] . ")</a> ".get_queststatus($row2["entry"]);
                       }
+                      if ($exclusivegroup > 0)
+                          $glue = " OR </li><li>";
+                      else
+                          $glue = " AND </li><li>";
+                      echo "<b>Exclusive Group:</b> <ul><li>".implode($glue, $temp)."</li></ul>";
                   }
 
                   echo "</fieldset>";
