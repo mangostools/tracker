@@ -7,9 +7,6 @@ $offset = empty($_GET['offset']) ? 0 : $_GET['offset'];
 $quest = empty($_GET['quest']) ? "x" : $_GET['quest'];
 $query = empty($_POST['query']) ? "Title or ID" : $_POST['query'];
 
-$character_name = "";
-$char_id = 0;
-
 function id2nick($id) {
     global $trackerdb;
     if ($id > 0)
@@ -36,6 +33,7 @@ function get_queststatus($quest)
 
     if(isset($character_name) && isset($char_id)){
         $char_quest_data= mysql_fetch_array(mysql_query("SELECT status, rewarded FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest = ".$quest));
+        $queststatus .= "</td><td>";
         switch ($char_quest_data["status"])
         {
             case 1: $queststatus .="<span class=\"tag tag_char_completed\" >$character_name completed</span> ";break;
@@ -183,6 +181,7 @@ if (isset($_GET["login"])) {
 }
 if (isset($_GET["dologout"])) {
     unset($_SESSION);
+    session_destroy();
 }
 
 if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
@@ -203,7 +202,10 @@ if (isset($_SESSION["id"]) && $_SESSION["id"] != 0) {
         }
     }
     else
+    {
         unset($_SESSION);
+        session_destroy();
+    }
 }
 
 //At this point we can do stuff that requires a valid session
@@ -564,6 +566,13 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $line["map"] . ">" . $line["name"] . "</a></td><td>" . $line["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
 
                   }
+                  echo "<tr><td colspan=4 style=background-color:#eee>Top 10 Reporters</td></tr>";
+                  $sql = mysql_query("SELECT count(id) as num, user FROM $trackerdb.status WHERE dbver >= $c_database_version GROUP BY user ORDER BY num DESC LIMIT 0,10") or die(mysql_error());
+                  while($row = mysql_fetch_array($sql))
+                  {
+                      echo "<tr><td colspan=2>".id2nick($row["user"])."</td><td colspan=2>".$row["num"]." report(s)</td></tr>";
+                  }
+
               }
                 /**
                 *
@@ -659,7 +668,7 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                       }
                       $areaname = mysql_result(mysql_query("SELECT a.name FROM $trackerdb.questsort as a WHERE a.id=-1*$areasort"), 0);
                   }
-                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a>&nbsp;>>&nbsp;<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$areaname</a>&nbsp;>>&nbsp;</td><td class=login>$login</td></tr>";
+                  echo "<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=$map>$mapname</a>&nbsp;>>&nbsp;<a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&areasort=$areasort>$areaname</a>&nbsp;>>&nbsp;</td><td colspan=2 class=login>$login</td></tr>";
 
 
                   $sql = mysql_query("SELECT m.entry, m.Title, m.RequiredRaces, m.QuestLevel FROM $mangosdb.quest_template as m WHERE m.ZoneOrSort =$areasort") or die(mysql_error());
