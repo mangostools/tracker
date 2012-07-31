@@ -20,7 +20,7 @@ function id2name($table, $id) {
     return mysql_result(mysql_query("SELECT name FROM $mangosdb.$table WHERE entry=" . $id), 0);
 }
 
-function get_queststatus($quest)
+function get_queststatus($quest, $table=false)
 {
     global $trackerdb, $characterdb, $status, $database_version, $character_name, $char_id, $c_database_version, $filter_status;
     $statusfilter = is_numeric($filter_status) ? " AND status = $filter_status " : "";
@@ -33,7 +33,8 @@ function get_queststatus($quest)
 
     if(isset($character_name) && isset($char_id)){
         $char_quest_data= mysql_fetch_array(mysql_query("SELECT status, rewarded FROM $characterdb.character_queststatus WHERE guid = $char_id AND quest = ".$quest));
-        $queststatus .= "</td><td>";
+        if($table)
+          $queststatus .= "</td><td>";
         switch ($char_quest_data["status"])
         {
             case 1: $queststatus .="<span class=\"tag tag_char_completed\" >$character_name completed</span> ";break;
@@ -677,7 +678,7 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                       $side_a = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 1101) ? "tag_alliance" : "tag_gray";
                       $side_h = ($row["RequiredRaces"] == 0 || $row["RequiredRaces"] & 690) ? "tag_horde" : "tag_gray";
 
-                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . get_queststatus($row["entry"]) . "</td></tr>";
+                      echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["entry"] . "</a></td><td><span class=\"tag ".$side_a."\">A</span> <span class=\"tag ".$side_h."\">H</span> <a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&quest=" . $row["entry"] . ">" . $row["Title"] . "</a> [".$row["QuestLevel"]."] </td><td>" . get_queststatus($row["entry"],true) . "</td></tr>";
                   }
               }
 
