@@ -560,8 +560,8 @@ if(isset($_GET["link_char"]) && isset($_POST["charname"]) && !empty($characterdb
                       if(is_numeric($filter_status) && empty($track_status))
                           continue;
                       $track_status = "<font color=" . $statuscolor[0] . ">" . $unknown . "</font>" . $track_status;
-                      $percent_completable = round((($working[5] + $working[6] + $working[7]) / $line["num"]) * 100, 2);
-                      $percent_not_completable = round(($working[1] / $line["num"]) * 100, 2);
+                      $percent_completable = ($line['num'] > 0 ? round((($working[5] + $working[6] + $working[7]) / $line["num"]) * 100, 2) : 0);
+                      $percent_not_completable = ($line['num'] > 0 ? round(($working[1] / $line["num"]) * 100, 2) : 0);
                       $percent_unknown = 100 - $percent_not_completable - $percent_completable;
                       $group_status = "<span class=\"tag tag5\" title=completable>$percent_completable %</span> <span class=\"tag tag1\" title=\"not completable\">$percent_not_completable %</span> <span class=\"tag tag0\" title=\"unknown\">$percent_unknown %</span>";
                       echo "<tr><td><a href=index.php?showrev=" . $show_data_for_rev . "&filterstatus=" . $filter_status . "&map=" . $line["map"] . ">" . $line["name"] . "</a></td><td>" . $line["num"] . "</td><td>$track_status</td><td>".$group_status."</td>";
